@@ -1,0 +1,86 @@
+version: '3.8'
+
+services:
+  # Movie Service - Quản lý dữ liệu phim
+  movie-service:
+    build:
+      context: ./movie-service
+      dockerfile: Dockerfile
+    ports:
+      - "5001:5001"
+    environment:
+      - FLASK_ENV=development
+      - DEBUG=True
+      - MOVIE_SERVICE_PORT=5001
+    volumes:
+      - ../web:/app/data
+    networks:
+      - microservices-network
+    depends_on:
+      - api-gateway
+
+  # Vector Service - Xử lý embeddings
+  vector-service:
+    build:
+      context: ./vector-service
+      dockerfile: Dockerfile
+    ports:
+      - "5003:5003"
+    environment:
+      - FLASK_ENV=development
+      - DEBUG=True
+      - VECTOR_SERVICE_PORT=5003
+      - MOVIE_SERVICE_URL=http://movie-service:5001
+    volumes:
+      - ../web:/app/data
+    networks:
+      - microservices-network
+    depends_on:
+      - movie-service
+
+  # Recommendation Service - Gợi ý phim
+  recommendation-service:
+    build:
+      context: ./recommendation-service
+      dockerfile: Dockerfile
+    ports:
+      - "5002:5002"
+    environment:
+      - FLASK_ENV=development
+      - DEBUG=True
+      - RECOMMENDATION_SERVICE_PORT=5002
+      - MOVIE_SERVICE_URL=http://movie-service:5001
+      - VECTOR_SERVICE_URL=http://vector-service:5003
+    networks:
+      - microservices-network
+    depends_on:
+      - movie-service
+      - vector-service
+
+  # API Gateway - Entry point
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    environment:
+      - FLASK_ENV=development
+      - DEBUG=True
+      - GATEWAY_PORT=5000
+      - MOVIE_SERVICE_URL=http://movie-service:5001
+      - RECOMMENDATION_SERVICE_URL=http://recommendation-service:5002
+      - VECTOR_SERVICE_URL=http://vector-service:5003
+    volumes:
+      - ../web/templates:/app/templates
+      - ../web/static:/app/static
+    networks:
+      - microservices-network
+    depends_on:
+      - movie-service
+      - recommendation-service
+      - vector-service
+
+networks:
+  microservices-network:
+    driver: bridge

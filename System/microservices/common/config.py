@@ -1,0 +1,47 @@
+"""
+Configuration for microservices
+"""
+import os
+from typing import Dict
+
+class Config:
+    """Base configuration"""
+    DEBUG = os.getenv('DEBUG', 'False').lower() == 'true'
+    
+    # Service ports
+    MOVIE_SERVICE_PORT = int(os.getenv('MOVIE_SERVICE_PORT', 5001))
+    RECOMMENDATION_SERVICE_PORT = int(os.getenv('RECOMMENDATION_SERVICE_PORT', 5002))
+    VECTOR_SERVICE_PORT = int(os.getenv('VECTOR_SERVICE_PORT', 5003))
+    GATEWAY_PORT = int(os.getenv('GATEWAY_PORT', 5000))
+    
+    # Service URLs
+    MOVIE_SERVICE_URL = os.getenv('MOVIE_SERVICE_URL', 'http://localhost:5001')
+    RECOMMENDATION_SERVICE_URL = os.getenv('RECOMMENDATION_SERVICE_URL', 'http://localhost:5002')
+    VECTOR_SERVICE_URL = os.getenv('VECTOR_SERVICE_URL', 'http://localhost:5003')
+    
+    # Data paths
+    MOVIES_CSV = os.getenv('MOVIES_CSV', '../data/imdb_movies_3000.csv')
+    MOVIE_VECTORS_NPZ = os.getenv('MOVIE_VECTORS_NPZ', '../data/movie_vectors.npz')
+    
+    # ML Model
+    EMBEDDING_MODEL = 'all-MiniLM-L6-v2'
+
+class DevelopmentConfig(Config):
+    """Development configuration"""
+    DEBUG = True
+
+class ProductionConfig(Config):
+    """Production configuration"""
+    DEBUG = False
+
+def get_config(env: str = None) -> Config:
+    """Get configuration based on environment"""
+    if env is None:
+        env = os.getenv('FLASK_ENV', 'development')
+    
+    config_map: Dict[str, type] = {
+        'development': DevelopmentConfig,
+        'production': ProductionConfig
+    }
+    
+    return config_map.get(env, DevelopmentConfig)()

@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MovieDB - Trang Xem Phim</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/wordcloud@1.2.2/src/wordcloud2.min.js"></script>
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <h1 class="logo" id="homeBtn" style="cursor:pointer;">MovieDB</h1>
+                <div class="search-box">
+                    <!-- Added dropdown to choose search field -->
+                    <select id="searchFieldSelect" aria-label="Chọn trường tìm kiếm">
+                        <option value="movie_name" selected>Tên phim</option>
+                        <option value="genre">Thể loại</option>
+                        <option value="director">Đạo diễn</option>
+                        <option value="star">Diễn viên</option>
+                        <option value="all">Tất cả</option>
+                    </select>
+
+                    <input type="text" id="searchInput" placeholder="Tìm kiếm phim, đạo diễn, thể loại...">
+                    <button id="searchBtn">Tìm kiếm</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Tabs Navigation -->
+    <div class="tabs-container">
+        <div class="container">
+            <div class="tabs">
+                <button class="tab-btn active" data-tab="movies">Danh sách phim</button>
+                <button class="tab-btn" data-tab="visualization">Data Visualization</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Content -->
+    <main class="main">
+        <div class="container">
+            <!-- Movie List View -->
+            <div id="movieListView" class="movie-list-view tab-content active">
+                <h2 class="section-title">Danh sách phim</h2>
+
+                <!-- For You recommendations -->
+                <div id="forYouSection" class="for-you-section">
+                    <h3 class="section-subtitle">Dành cho bạn</h3>
+                    <div id="forYouContainer" class="for-you-grid">
+                        <!-- populated by script.js -->
+                    </div>
+                    <h3 class="section-subtitle">Phim nổi bật</h3>
+                </div>
+
+                <div id="moviesContainer" class="movies-grid">
+                    
+                    <!-- Movies will be loaded here -->
+                </div>
+                <div class="pagination">
+                    <button id="prevBtn" class="pagination-btn">Trước</button>
+                    <span id="pageInfo" class="page-info">Trang 1</span>
+                    <button id="nextBtn" class="pagination-btn">Sau</button>
+                </div>
+            </div>
+
+            <!-- Movie Detail View -->
+            <div id="movieDetailView" class="movie-detail-view" style="display: none;">
+                <button id="backBtn" class="back-btn">← Quay lại</button>
+                <div id="movieDetail" class="movie-detail">
+                    <!-- Movie details will be loaded here -->
+                </div>
+            </div>
+
+            <!-- Data Visualization View -->
+            <div id="visualizationView" class="visualization-view tab-content" style="display: none;">
+                <h2 class="section-title">Data Visualization</h2>
+                
+                <div class="visualization-grid">
+                    <!-- Rating Distribution -->
+                    <div class="viz-card">
+                        <h3 class="viz-title">Rating Distribution</h3>
+                        <canvas id="ratingChart"></canvas>
+                    </div>
+
+                    <!-- Top Movies -->
+                    <div class="viz-card">
+                        <h3 class="viz-title">Top Movies</h3>
+                        <canvas id="topMoviesChart"></canvas>
+                    </div>
+
+                    <!-- Top Genres -->
+                    <div class="viz-card">
+                        <h3 class="viz-title">Top Genres</h3>
+                        <canvas id="topGenresChart"></canvas>
+                    </div>
+
+                    <!-- Heatmap -->
+                    <div class="viz-card">
+                        <h3 class="viz-title">Average Rating by Year (Heatmap)</h3>
+                        <canvas id="heatmapChart"></canvas>
+                    </div>
+
+                    <!-- Bar Chart -->
+                    <div class="viz-card">
+                        <h3 class="viz-title">Movies per Year (Bar Chart)</h3>
+                        <canvas id="barChart"></canvas>
+                    </div>
+
+                    <!-- Histogram -->
+                    <div class="viz-card">
+                        <h3 class="viz-title">Runtime Distribution (Minute)</h3>
+                        <canvas id="histogramChart"></canvas>
+                    </div>
+
+                    <!-- Word Cloud -->
+                    <div class="viz-card full-width">
+                        <h3 class="viz-title">Word Cloud</h3>
+                        <div id="wordcloudContainer" style="width: 100%; height: 400px; position: relative;"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Loading Spinner -->
+    <div id="loadingSpinner" class="loading-spinner" style="display: none;">
+        <div class="spinner"></div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
+

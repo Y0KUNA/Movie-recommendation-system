@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MovieDB - Trang Xem Phim</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <!-- Header -->
+    <header class="header">
+        <div class="container">
+            <div class="header-content">
+                <h1 class="logo">MovieDB</h1>
+                <div class="search-box">
+                    <input type="text" id="searchInput" placeholder="Tìm kiếm phim, đạo diễn, thể loại...">
+                    <button id="searchBtn">Tìm kiếm</button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="main">
+        <div class="container">
+            <!-- Movie List View -->
+            <div id="movieListView" class="movie-list-view">
+                <h2 class="section-title">Danh sách phim</h2>
+                <div id="moviesContainer" class="movies-grid">
+                    <!-- Movies will be loaded here -->
+                </div>
+                <div class="pagination">
+                    <button id="prevBtn" class="pagination-btn">Trước</button>
+                    <span id="pageInfo" class="page-info">Trang 1</span>
+                    <button id="nextBtn" class="pagination-btn">Sau</button>
+                </div>
+            </div>
+
+            <!-- Movie Detail View -->
+            <div id="movieDetailView" class="movie-detail-view" style="display: none;">
+                <button id="backBtn" class="back-btn">← Quay lại</button>
+                <div id="movieDetail" class="movie-detail">
+                    <!-- Movie details will be loaded here -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Loading Spinner -->
+    <div id="loadingSpinner" class="loading-spinner" style="display: none;">
+        <div class="spinner"></div>
+    </div>
+
+    <script src="{{ url_for('static', filename='script.js') }}"></script>
+</body>
+</html>
+
