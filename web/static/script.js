@@ -20,6 +20,10 @@ const pageInfo = document.getElementById('pageInfo');
 const loadingSpinner = document.getElementById('loadingSpinner');
 const visualizationView = document.getElementById('visualizationView');
 const tabButtons = document.querySelectorAll('.tab-btn');
+const similarMoviesHomeContainer = document.getElementById('similarMoviesHomeContainer');
+const similarHomeSource = document.getElementById('similarHomeSource');
+const similarMoviesSection = document.getElementById('similarMoviesSection');
+const similarMoviesContainer = document.getElementById('similarMoviesContainer');
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -28,7 +32,13 @@ document.addEventListener('DOMContentLoaded', () => {
         currentSearchField = searchFieldSelect.value;
     }
 
-    loadMovies();
+    const initialMovieId = getMovieIdFromPath();
+    if (initialMovieId) {
+        showMovieDetail(initialMovieId, false);
+    } else {
+        loadMovies();
+        loadFeaturedSimilarMovies();
+    }
 
     // Event listeners
     searchBtn.addEventListener('click', handleSearch);
@@ -119,7 +129,7 @@ function displayMovies(movies) {
 }
 
 // Show movie detail
-async function showMovieDetail(movieId) {
+async function showMovieDetail(movieId, updateUrl = true) {
     showLoading();
     try {
         const response = await fetch(`/api/movies/${movieId}`);
@@ -131,9 +141,12 @@ async function showMovieDetail(movieId) {
         }
 
         // ⭐ Update URL without reload
-        history.pushState({ movieId }, "", `/movies/${movieId}`);
+        if (updateUrl) {
+            history.pushState({ movieId }, "", `/movies/${movieId}`);
+        }
 
         displayMovieDetail(movie);
+        loadSimilarRecommendations(movie.movie_id);
         movieListView.style.display = 'none';
         movieDetailView.style.display = 'block';
         window.scrollTo(0, 0);
@@ -218,9 +231,101 @@ function displayMovieDetail(movie) {
 function showMovieList() {
     movieDetailView.style.display = 'none';
     movieListView.style.display = 'block';
+    if (similarMoviesSection) {
+        similarMoviesSection.style.display = 'none';
+    }
 
     // ⭐ Restore URL back to homepage
     history.pushState({}, "", "/");
+}
+
+function getMovieIdFromPath() {
+    const match = window.location.pathname.match(/^\/movies\/(.+)$/);
+    return match ? decodeURIComponent(match[1]) : null;
+}
+
+async function loadFeaturedSimilarMovies(topN = 8) {
+    if (!similarMoviesHomeContainer) return;
+    similarMoviesHomeContainer.innerHTML = '<p class="loading-inline">Đang tải phim tương tự...</p>';
+    try {
+        // Use System API endpoints:
+        // 1) pick a seed movie from the movie API
+        // 2) fetch similar movies from recommendation API
+        const seedResp = await fetch('/api/movies?page=1&per_page=1');
+        const seedData = await seedResp.json();
+        const seedMovie = (seedData.movies && seedData.movies[0]) ? seedData.movies[0] : null;
+
+        if (!seedMovie || !seedMovie.movie_id) {
+            similarMoviesHomeContainer.innerHTML = '<p style="color: var(--text-secondary);">Không có dữ liệu phim.</p>';
+            return;
+        }
+
+        if (similarHomeSource) {
+            similarHomeSource.textContent = `Gợi ý dựa trên: ${seedMovie.movie_name || 'N/A'}`;
+        }
+
+        const response = await fetch(`/api/recommendations/similar?movie_id=${encodeURIComponent(seedMovie.movie_id)}&method=hybrid&top_k=${topN}`);
+        const data = await response.json();
+        renderSimilarMovies(data.recommendations || [], similarMoviesHomeContainer);
+    } catch (error) {
+        console.error('Error loading featured similar movies:', error);
+        similarMoviesHomeContainer.innerHTML = '<p style="color: var(--text-secondary);">Không thể tải phim tương tự.</p>';
+    }
+}
+
+async function loadSimilarRecommendations(movieId, topN = 10) {
+    if (!similarMoviesContainer || !similarMoviesSection) return;
+    similarMoviesSection.style.display = 'block';
+    similarMoviesContainer.innerHTML = '<p class="loading-inline">Đang tải phim tương tự...</p>';
+    try {
+        const response = await fetch(`/api/recommendations/similar?movie_id=${encodeURIComponent(movieId)}&method=hybrid&top_k=${topN}`);
+        const data = await response.json();
+        if (data.error) {
+            similarMoviesSection.style.display = 'none';
+            return;
+        }
+        renderSimilarMovies(data.recommendations || [], similarMoviesContainer);
+        if (!data.recommendations || data.recommendations.length === 0) {
+            similarMoviesSection.style.display = 'none';
+        }
+    } catch (error) {
+        console.error('Error loading similar movies:', error);
+        similarMoviesContainer.innerHTML = '<p style="color: var(--text-secondary);">Không thể tải phim tương tự.</p>';
+    }
+}
+
+function renderSimilarMovies(movies, container) {
+    if (!container) return;
+    if (!movies || movies.length === 0) {
+        container.innerHTML = '<p style="color: var(--text-secondary);">Không có phim tương tự.</p>';
+        return;
+    }
+    container.innerHTML = movies.map(movie => {
+        const posterHtml = movie.poster
+            ? `<img src="${escapeHtml(movie.poster)}" alt="Poster ${escapeHtml(movie.movie_name || '')}" loading="lazy" onerror="handlePosterError(event)">`
+            : '';
+        const similarityValue = (typeof movie.similarity_score === 'number') ? movie.similarity_score : movie.score;
+        const scoreDisplay = typeof similarityValue === 'number'
+            ? `Độ tương đồng: ${similarityValue.toFixed(2)}`
+            : '';
+        return `
+            <div class="recommend-card" onclick="showMovieDetail('${movie.movie_id}')">
+                <div class="recommend-poster poster-container ${movie.poster ? 'has-image' : ''}">
+                    ${posterHtml}
+                    <span class="poster-placeholder">${getPosterPlaceholder(movie.movie_name)}</span>
+                </div>
+                <div class="recommend-info">
+                    <div class="recommend-title">${escapeHtml(movie.movie_name || 'N/A')}</div>
+                    <div class="recommend-meta">
+                        ${movie.year || ''}
+                        ${movie.rating ? ` ⭐ ${movie.rating}` : ''}
+                    </div>
+                    ${movie.genre ? `<div class="recommend-genres">${escapeHtml(movie.genre)}</div>` : ''}
+                    ${scoreDisplay ? `<div class="recommend-score">${scoreDisplay}</div>` : ''}
+                </div>
+            </div>
+        `;
+    }).join('');
 }
 
 

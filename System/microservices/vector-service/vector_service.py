@@ -50,6 +50,19 @@ class VectorRepository:
             else:
                 self._vectors_cache = vectors
             
+            row_count = int(self._vectors_cache.shape[0])
+            if len(self.movie_ids) != row_count:
+                logger.warning(
+                    "Vector row count (%s) does not match movie ID count (%s). "
+                    "Truncating to aligned minimum length.",
+                    row_count,
+                    len(self.movie_ids)
+                )
+                aligned_len = min(row_count, len(self.movie_ids))
+                self._vectors_cache = self._vectors_cache[:aligned_len]
+                self.movie_ids = self.movie_ids[:aligned_len]
+                self._id_to_index = {mid: idx for idx, mid in enumerate(self.movie_ids)}
+
             logger.info(f"Loaded vectors with shape: {self._vectors_cache.shape}")
             return self._vectors_cache
             

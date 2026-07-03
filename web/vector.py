@@ -7,7 +7,7 @@ from scipy.sparse import save_npz
 # ============================
 # 1. Load dataset
 # ============================
-df = pd.read_csv("compilation_movies_cleaned.csv")
+df = pd.read_csv("web\imdb_movies_3000.csv")
 
 # Fill NA
 df['genre'] = df['genre'].fillna('')
@@ -55,6 +55,6 @@ combined_features = hstack([
     star_vec,
     desc_sparse
 ]).tocsr()
-save_npz("movie_vectors.npz", combined_features)
+save_npz("D:\Huy\Documents\KHDL\Recommend-system\movie_vectors.npz", combined_features)
 print("Done!")
 print("Final feature matrix shape:", combined_features.shape)

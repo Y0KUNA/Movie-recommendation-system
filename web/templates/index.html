@@ -46,6 +46,14 @@
         <div class="container">
             <!-- Movie List View -->
             <div id="movieListView" class="movie-list-view tab-content active">
+                <div id="similarMoviesHomeSection" class="similar-home-section">
+                    <h2 class="section-title">Phim tương tự</h2>
+                    <p id="similarHomeSource" class="similar-source"></p>
+                    <div id="similarMoviesHomeContainer" class="recommend-grid">
+                        <!-- Similar movies loaded here -->
+                    </div>
+                </div>
+
                 <h2 class="section-title">Danh sách phim</h2>
                 <div id="moviesContainer" class="movies-grid">
                     <!-- Movies will be loaded here -->
@@ -62,6 +70,12 @@
                 <button id="backBtn" class="back-btn">← Quay lại</button>
                 <div id="movieDetail" class="movie-detail">
                     <!-- Movie details will be loaded here -->
+                </div>
+                <div id="similarMoviesSection" class="detail-section similar-detail-section" style="display: none;">
+                    <h2 class="detail-section-title">Phim tương tự</h2>
+                    <div id="similarMoviesContainer" class="recommend-grid">
+                        <!-- Similar movies loaded here -->
+                    </div>
                 </div>
             </div>
 

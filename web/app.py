@@ -2,6 +2,7 @@ from flask import Flask, render_template, jsonify, request
 import csv
 import json
 import os
+import math
 from collections import Counter, defaultdict
 import re
 
@@ -64,8 +65,90 @@ def get_movies():
         movies_data = load_movies()
     return movies_data
 
+# --- Content-based similarity ---
+content_vectors_cache = None
+
+def _tokens_for_movie(m):
+    parts = []
+    for k in ('movie_name', 'genre', 'director', 'star', 'description'):
+        parts.append((m.get(k) or '').lower())
+    text = ' '.join(parts)
+    return re.findall(r'\b[a-z0-9]{3,}\b', text)
+
+def _build_content_vectors(movies):
+    vectors = {}
+    for m in movies:
+        mid = m.get('movie_id')
+        if mid:
+            vectors[mid] = Counter(_tokens_for_movie(m))
+    return vectors
+
+def _get_content_vectors():
+    global content_vectors_cache
+    if content_vectors_cache is None:
+        content_vectors_cache = _build_content_vectors(get_movies())
+    return content_vectors_cache
+
+def _cosine_sim_counts(c1, c2):
+    if not c1 or not c2:
+        return 0.0
+    dot = sum(v * c2[t] for t, v in c1.items() if t in c2)
+    norm1 = math.sqrt(sum(v * v for v in c1.values()))
+    norm2 = math.sqrt(sum(v * v for v in c2.values()))
+    if norm1 == 0 or norm2 == 0:
+        return 0.0
+    return dot / (norm1 * norm2)
+
+def get_similar_movies(movie_id, top_n=10):
+    movies = get_movies()
+    id_to_movie = {m['movie_id']: m for m in movies}
+    vectors = _get_content_vectors()
+    vi = vectors.get(movie_id)
+    if not vi:
+        return []
+    sims = []
+    for other_id, vj in vectors.items():
+        if other_id == movie_id:
+            continue
+        s = _cosine_sim_counts(vi, vj)
+        if s > 0:
+            sims.append((other_id, s))
+    sims.sort(key=lambda x: x[1], reverse=True)
+    results = []
+    for other_id, score in sims[:top_n]:
+        m = id_to_movie.get(other_id)
+        if not m:
+            continue
+        results.append({
+            'movie_id': m['movie_id'],
+            'movie_name': m.get('movie_name'),
+            'year': m.get('year'),
+            'rating': m.get('rating'),
+            'genre': m.get('genre'),
+            'poster': m.get('poster'),
+            'score': round(float(score), 4),
+        })
+    return results
+
+def _parse_rating(r):
+    try:
+        return float(r) if r else 0
+    except (TypeError, ValueError):
+        return 0
+
+def _enrich_similar(movie_id, top_n):
+    all_movies = get_movies()
+    source = next((m for m in all_movies if m.get('movie_id') == movie_id), None)
+    if not source:
+        return None, []
+    return source, get_similar_movies(movie_id, top_n)
+
 @app.route('/')
 def index():
+    return render_template('index.html')
+
+@app.route('/movies/<movie_id>')
+def movie_page(movie_id):
     return render_template('index.html')
 
 @app.route('/api/movies')
@@ -132,6 +215,37 @@ def get_movie_detail(movie_id):
         return jsonify(movie)
     else:
         return jsonify({'error': 'Movie not found'}), 404
+
+@app.route('/api/movies/<movie_id>/similar')
+def get_similar_movies_api(movie_id):
+    top_n = request.args.get('top_n', 10, type=int)
+    source, recommendations = _enrich_similar(movie_id, top_n)
+    if not source:
+        return jsonify({'error': 'Movie not found'}), 404
+    return jsonify({
+        'movie_id': movie_id,
+        'source_movie': {
+            'movie_id': source.get('movie_id'),
+            'movie_name': source.get('movie_name'),
+        },
+        'recommendations': recommendations,
+    })
+
+@app.route('/api/movies/similar/featured')
+def get_featured_similar():
+    top_n = request.args.get('top_n', 8, type=int)
+    all_movies = get_movies()
+    if not all_movies:
+        return jsonify({'source_movie': None, 'recommendations': []})
+    featured = max(all_movies, key=lambda m: _parse_rating(m.get('rating')))
+    source, recommendations = _enrich_similar(featured['movie_id'], top_n)
+    return jsonify({
+        'source_movie': {
+            'movie_id': source.get('movie_id'),
+            'movie_name': source.get('movie_name'),
+        },
+        'recommendations': recommendations,
+    })
 
 # Visualization endpoints
 @app.route('/api/visualization/rating-distribution')

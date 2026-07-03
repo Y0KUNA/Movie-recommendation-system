@@ -29,6 +29,7 @@ services:
       - VECTOR_SERVICE_PORT=5003
       - MOVIE_SERVICE_URL=http://movie-service:5001
       - MOVIE_VECTORS_NPZ=/app/data/movie_vectors.npz
+      - MOVIE_VECTORS_METADATA_CSV=/app/data/imdb_movies_3000.csv
     volumes:
       - ../../web:/app/data
     networks:

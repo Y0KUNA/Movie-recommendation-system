@@ -20,7 +20,7 @@ class Config:
     VECTOR_SERVICE_URL = os.getenv('VECTOR_SERVICE_URL', 'http://localhost:5003')
     
     # Data paths
-    MOVIES_CSV = os.getenv('MOVIES_CSV', '../data/imdb_movies_3000.csv')
+    MOVIES_CSV = os.getenv('MOVIES_CSV', 'web/imdb_movies_3000.csv')
     MOVIE_VECTORS_NPZ = os.getenv('MOVIE_VECTORS_NPZ', '../data/movie_vectors.npz')
     
     # ML Model
