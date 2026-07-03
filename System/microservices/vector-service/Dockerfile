@@ -5,16 +5,16 @@ FROM python:3.11-slim
 WORKDIR /app
 
 # Copy requirements
-COPY requirements.txt .
+COPY vector-service/requirements.txt .
 
 # Install Python dependencies
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY . .
+COPY vector-service/ .
 
 # Copy common utilities
-COPY ../common /app/common
+COPY common /app/common
 
 # Expose port
 EXPOSE 5003

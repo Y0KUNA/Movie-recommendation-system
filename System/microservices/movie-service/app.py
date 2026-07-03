@@ -21,8 +21,10 @@ app = Flask(__name__)
 config = get_config()
 
 # Determine data path
-data_dir = Path(__file__).parent.parent.parent / 'web'
-csv_path = str(data_dir / 'imdb_movies_3000.csv')
+csv_path = os.getenv(
+    'MOVIES_CSV',
+    str(Path(__file__).parent.parent.parent / 'web' / 'imdb_movies_3000.csv')
+)
 
 logger.info(f"Looking for CSV at: {csv_path}")
 logger.info(f"CSV exists: {os.path.exists(csv_path)}")

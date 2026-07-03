@@ -22,8 +22,10 @@ app = Flask(__name__)
 config = get_config()
 
 # Determine data path
-data_dir = Path(__file__).parent.parent.parent / 'web'
-vectors_path = str(data_dir / 'movie_vectors.npz')
+vectors_path = os.getenv(
+    'MOVIE_VECTORS_NPZ',
+    str(Path(__file__).parent.parent.parent / 'web' / 'movie_vectors.npz')
+)
 
 logger.info(f"Looking for vectors at: {vectors_path}")
 logger.info(f"Vectors exist: {os.path.exists(vectors_path)}")

@@ -1,29 +1,26 @@
-version: '3.8'
-
 services:
   # Movie Service - Quản lý dữ liệu phim
   movie-service:
     build:
-      context: ./movie-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: movie-service/Dockerfile
     ports:
       - "5001:5001"
     environment:
       - FLASK_ENV=development
       - DEBUG=True
       - MOVIE_SERVICE_PORT=5001
+      - MOVIES_CSV=/app/data/imdb_movies_3000.csv
     volumes:
-      - ../web:/app/data
+      - ../../web:/app/data
     networks:
       - microservices-network
-    depends_on:
-      - api-gateway
 
   # Vector Service - Xử lý embeddings
   vector-service:
     build:
-      context: ./vector-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: vector-service/Dockerfile
     ports:
       - "5003:5003"
     environment:
@@ -31,8 +28,9 @@ services:
       - DEBUG=True
       - VECTOR_SERVICE_PORT=5003
       - MOVIE_SERVICE_URL=http://movie-service:5001
+      - MOVIE_VECTORS_NPZ=/app/data/movie_vectors.npz
     volumes:
-      - ../web:/app/data
+      - ../../web:/app/data
     networks:
       - microservices-network
     depends_on:
@@ -41,8 +39,8 @@ services:
   # Recommendation Service - Gợi ý phim
   recommendation-service:
     build:
-      context: ./recommendation-service
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: recommendation-service/Dockerfile
     ports:
       - "5002:5002"
     environment:
@@ -60,8 +58,8 @@ services:
   # API Gateway - Entry point
   api-gateway:
     build:
-      context: ./api-gateway
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: api-gateway/Dockerfile
     ports:
       - "5000:5000"
     environment:
@@ -71,9 +69,11 @@ services:
       - MOVIE_SERVICE_URL=http://movie-service:5001
       - RECOMMENDATION_SERVICE_URL=http://recommendation-service:5002
       - VECTOR_SERVICE_URL=http://vector-service:5003
+      - GATEWAY_TEMPLATE_DIR=/app/templates
+      - GATEWAY_STATIC_DIR=/app/static
     volumes:
-      - ../web/templates:/app/templates
-      - ../web/static:/app/static
+      - ../../web/templates:/app/templates
+      - ../../web/static:/app/static
     networks:
       - microservices-network
     depends_on:

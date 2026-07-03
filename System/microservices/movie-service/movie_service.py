@@ -102,6 +102,13 @@ class MovieRepository:
             'director': lambda m: (m.director or '').lower(),
             'star': lambda m: (m.star or '').lower(),
             'description': lambda m: (m.description or '').lower(),
+            'all': lambda m: ' '.join([
+                m.movie_name or '',
+                m.genre or '',
+                m.director or '',
+                m.star or '',
+                m.description or '',
+            ]).lower(),
         }
         
         get_field_value = field_map.get(field, field_map['movie_name'])
