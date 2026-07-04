@@ -209,10 +209,12 @@ class UserRepository:
 
 class UserPreferenceRepository:
     def __init__(self):
-        self.mongo_uri = os.getenv(
-            'MONGO_URI',
-            'mongodb+srv://mongodb:mongodb@user-preference-db.32k9lom.mongodb.net/?appName=user-preference-db',
-        )
+        self.mongo_uri = os.getenv('MONGO_URI')
+        if not self.mongo_uri:
+            raise ValueError(
+                'MONGO_URI is required. Set it in System/microservices/.env '
+                '(see .env.example).'
+            )
         self.db_name = os.getenv('MONGO_DB_NAME', 'user-preference-db')
         self.client = MongoClient(self.mongo_uri, serverSelectionTimeoutMS=5000)
         self.db = self.client[self.db_name]

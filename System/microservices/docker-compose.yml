@@ -76,6 +76,8 @@ services:
     container_name: user-service
     ports:
       - "5004:5004"
+    env_file:
+      - .env
     environment:
       FLASK_ENV: development
       DEBUG: "True"
@@ -86,10 +88,6 @@ services:
       DB_NAME: user_db
       DB_USER: postgres
       DB_PASSWORD: postgres
-      JWT_SECRET: recommend-system-user-secret
-      JWT_EXPIRES_HOURS: 24
-      MONGO_URI: mongodb+srv://mongodb:mongodb@user-preference-db.32k9lom.mongodb.net/?appName=user-preference-db
-      MONGO_DB_NAME: user-preference-db
     depends_on:
       - user-db
     networks:
