@@ -29,6 +29,11 @@ start "Recommendation Service" cmd /k "cd recommendation-service && pip install 
 
 timeout /t 3 /nobreak
 
+echo Starting User Service on port 5004...
+start "User Service" cmd /k "cd user-service && pip install -r requirements.txt && python app.py"
+
+timeout /t 3 /nobreak
+
 echo Starting API Gateway on port 5000...
 start "API Gateway" cmd /k "cd api-gateway && pip install -r requirements.txt && python app.py"
 
@@ -42,6 +47,7 @@ echo - API Gateway: http://localhost:5000
 echo - Movie Service: http://localhost:5001
 echo - Recommendation Service: http://localhost:5002
 echo - Vector Service: http://localhost:5003
+echo - User Service: http://localhost:5004
 echo.
 echo Check service health: http://localhost:5000/health/services
 echo.

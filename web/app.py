@@ -143,13 +143,15 @@ def _enrich_similar(movie_id, top_n):
         return None, []
     return source, get_similar_movies(movie_id, top_n)
 
+API_GATEWAY_URL = os.getenv('API_GATEWAY_URL', 'http://localhost:5000')
+
 @app.route('/')
 def index():
-    return render_template('index.html')
+    return render_template('index.html', api_gateway_url=API_GATEWAY_URL)
 
 @app.route('/movies/<movie_id>')
 def movie_page(movie_id):
-    return render_template('index.html')
+    return render_template('index.html', api_gateway_url=API_GATEWAY_URL)
 
 @app.route('/api/movies')
 def get_movies_api():
@@ -464,5 +466,5 @@ def get_wordcloud_data():
     return jsonify(top_words)
 
 if __name__ == '__main__':
-    app.run(debug=True, port=5000)
+    app.run(debug=True, port=5005)
 

@@ -27,9 +27,81 @@
                     <input type="text" id="searchInput" placeholder="Tìm kiếm phim, đạo diễn, thể loại...">
                     <button id="searchBtn">Tìm kiếm</button>
                 </div>
+                <div class="auth-area">
+                    <div id="guestActions" class="guest-actions">
+                        <button id="openLoginBtn" class="auth-btn secondary">Đăng nhập</button>
+                        <button id="openRegisterBtn" class="auth-btn primary">Đăng ký</button>
+                    </div>
+                    <div id="userActions" class="user-actions" style="display: none;">
+                        <button id="profileBtn" class="profile-btn">
+                            <span id="userInitial" class="user-initial">U</span>
+                            <span id="userNameLabel">Tài khoản</span>
+                        </button>
+                        <button id="logoutBtn" class="auth-btn secondary">Đăng xuất</button>
+                    </div>
+                </div>
             </div>
         </div>
     </header>
+
+    <div id="authModal" class="auth-modal" aria-hidden="true" style="display: none;">
+        <div class="auth-modal-backdrop" data-close-auth></div>
+        <div class="auth-panel" role="dialog" aria-modal="true" aria-labelledby="authModalTitle">
+            <button id="closeAuthModalBtn" class="modal-close" aria-label="Đóng">×</button>
+            <div class="auth-tabs">
+                <button id="loginTabBtn" class="auth-tab active" data-auth-mode="login">Đăng nhập</button>
+                <button id="registerTabBtn" class="auth-tab" data-auth-mode="register">Đăng ký</button>
+                <button id="profileTabBtn" class="auth-tab" data-auth-mode="profile" style="display: none;">Hồ sơ</button>
+            </div>
+            <h2 id="authModalTitle" class="auth-title">Đăng nhập</h2>
+            <form id="loginForm" class="auth-form">
+                <label>
+                    Email hoặc username
+                    <input id="loginIdentifier" type="text" autocomplete="username" required>
+                </label>
+                <label>
+                    Mật khẩu
+                    <input id="loginPassword" type="password" autocomplete="current-password" required>
+                </label>
+                <button type="submit" class="auth-submit">Đăng nhập</button>
+            </form>
+            <form id="registerForm" class="auth-form" style="display: none;">
+                <label>
+                    Username
+                    <input id="registerUsername" type="text" autocomplete="username" minlength="3" required>
+                </label>
+                <label>
+                    Email
+                    <input id="registerEmail" type="email" autocomplete="email" required>
+                </label>
+                <label>
+                    Họ tên
+                    <input id="registerFullName" type="text" autocomplete="name">
+                </label>
+                <label>
+                    Mật khẩu
+                    <input id="registerPassword" type="password" autocomplete="new-password" minlength="6" required>
+                </label>
+                <button type="submit" class="auth-submit">Tạo tài khoản</button>
+            </form>
+            <form id="profileForm" class="auth-form" style="display: none;">
+                <label>
+                    Username
+                    <input id="profileUsername" type="text" autocomplete="username" minlength="3" required>
+                </label>
+                <label>
+                    Email
+                    <input id="profileEmail" type="email" autocomplete="email" required>
+                </label>
+                <label>
+                    Họ tên
+                    <input id="profileFullName" type="text" autocomplete="name">
+                </label>
+                <button type="submit" class="auth-submit">Lưu thay đổi</button>
+            </form>
+            <p id="authMessage" class="auth-message" aria-live="polite"></p>
+        </div>
+    </div>
 
     <!-- Tabs Navigation -->
     <div class="tabs-container">
@@ -135,6 +207,9 @@
         <div class="spinner"></div>
     </div>
 
+    <script>
+        window.API_GATEWAY_URL = {{ api_gateway_url | tojson }};
+    </script>
     <script src="{{ url_for('static', filename='script.js') }}"></script>
 </body>
 </html>

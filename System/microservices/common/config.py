@@ -13,14 +13,14 @@ class Config:
     RECOMMENDATION_SERVICE_PORT = int(os.getenv('RECOMMENDATION_SERVICE_PORT', 5002))
     VECTOR_SERVICE_PORT = int(os.getenv('VECTOR_SERVICE_PORT', 5003))
     GATEWAY_PORT = int(os.getenv('GATEWAY_PORT', 5000))
-    
+    USER_PORT = int(os.getenv('USER_PORT', 5004))
     # Service URLs
     MOVIE_SERVICE_URL = os.getenv('MOVIE_SERVICE_URL', 'http://localhost:5001')
     RECOMMENDATION_SERVICE_URL = os.getenv('RECOMMENDATION_SERVICE_URL', 'http://localhost:5002')
     VECTOR_SERVICE_URL = os.getenv('VECTOR_SERVICE_URL', 'http://localhost:5003')
-    
+    USER_SERVICE_URL = os.getenv('USER_SERVICE_URL', 'http://localhost:5004')
     # Data paths
-    MOVIES_CSV = os.getenv('MOVIES_CSV', 'web/imdb_movies_3000.csv')
+    MOVIES_CSV = os.getenv('MOVIES_CSV', '../data/imdb_movies_3000.csv')
     MOVIE_VECTORS_NPZ = os.getenv('MOVIE_VECTORS_NPZ', '../data/movie_vectors.npz')
     
     # ML Model

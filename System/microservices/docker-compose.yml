@@ -1,87 +1,186 @@
+version: "3.9"
+
 services:
-  # Movie Service - Quản lý dữ liệu phim
+  # ==========================
+  # Movie Database
+  # ==========================
+  movie-db:
+    image: postgres:17
+    container_name: movie-db
+    restart: always
+    environment:
+      POSTGRES_DB: movie_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - movie-db-data:/var/lib/postgresql/data
+    networks:
+      - microservices-network
+
+  # ==========================
+  # Movie Service
+  # ==========================
   movie-service:
     build:
       context: .
       dockerfile: movie-service/Dockerfile
+    container_name: movie-service
     ports:
       - "5001:5001"
     environment:
-      - FLASK_ENV=development
-      - DEBUG=True
-      - MOVIE_SERVICE_PORT=5001
-      - MOVIES_CSV=/app/data/imdb_movies_3000.csv
+      FLASK_ENV: development
+      DEBUG: "True"
+
+      MOVIE_SERVICE_PORT: 5001
+      MOVIES_CSV: /app/data/imdb_movies_3000.csv
+
+      DB_HOST: movie-db
+      DB_PORT: 5432
+      DB_NAME: movie_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
     volumes:
       - ../../web:/app/data
+    depends_on:
+      - movie-db
     networks:
       - microservices-network
 
-  # Vector Service - Xử lý embeddings
+  # ==========================
+  # User Database
+  # ==========================
+  user-db:
+    image: postgres:17
+    container_name: user-db
+    restart: always
+    environment:
+      POSTGRES_DB: user_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5434:5432"
+    volumes:
+      - user-db-data:/var/lib/postgresql/data
+    networks:
+      - microservices-network
+
+  # ==========================
+  # User Service
+  # ==========================
+  user-service:
+    build:
+      context: .
+      dockerfile: user-service/Dockerfile
+    container_name: user-service
+    ports:
+      - "5004:5004"
+    environment:
+      FLASK_ENV: development
+      DEBUG: "True"
+
+      USER_SERVICE_PORT: 5004
+      DB_HOST: user-db
+      DB_PORT: 5432
+      DB_NAME: user_db
+      DB_USER: postgres
+      DB_PASSWORD: postgres
+      JWT_SECRET: recommend-system-user-secret
+      JWT_EXPIRES_HOURS: 24
+      MONGO_URI: mongodb+srv://mongodb:mongodb@user-preference-db.32k9lom.mongodb.net/?appName=user-preference-db
+      MONGO_DB_NAME: user-preference-db
+    depends_on:
+      - user-db
+    networks:
+      - microservices-network
+
+  # ==========================
+  # Vector Service
+  # ==========================
   vector-service:
     build:
       context: .
       dockerfile: vector-service/Dockerfile
+    container_name: vector-service
     ports:
       - "5003:5003"
     environment:
-      - FLASK_ENV=development
-      - DEBUG=True
-      - VECTOR_SERVICE_PORT=5003
-      - MOVIE_SERVICE_URL=http://movie-service:5001
-      - MOVIE_VECTORS_NPZ=/app/data/movie_vectors.npz
-      - MOVIE_VECTORS_METADATA_CSV=/app/data/imdb_movies_3000.csv
+      FLASK_ENV: development
+      DEBUG: "True"
+
+      VECTOR_SERVICE_PORT: 5003
+      MOVIE_SERVICE_URL: http://movie-service:5001
+
+      MOVIE_VECTORS_NPZ: /app/data/movie_vectors.npz
+      MOVIE_VECTORS_METADATA_CSV: /app/data/imdb_movies_3000.csv
     volumes:
       - ../../web:/app/data
-    networks:
-      - microservices-network
     depends_on:
       - movie-service
+    networks:
+      - microservices-network
 
-  # Recommendation Service - Gợi ý phim
+  # ==========================
+  # Recommendation Service
+  # ==========================
   recommendation-service:
     build:
       context: .
       dockerfile: recommendation-service/Dockerfile
+    container_name: recommendation-service
     ports:
       - "5002:5002"
     environment:
-      - FLASK_ENV=development
-      - DEBUG=True
-      - RECOMMENDATION_SERVICE_PORT=5002
-      - MOVIE_SERVICE_URL=http://movie-service:5001
-      - VECTOR_SERVICE_URL=http://vector-service:5003
-    networks:
-      - microservices-network
+      FLASK_ENV: development
+      DEBUG: "True"
+
+      RECOMMENDATION_SERVICE_PORT: 5002
+      MOVIE_SERVICE_URL: http://movie-service:5001
+      VECTOR_SERVICE_URL: http://vector-service:5003
     depends_on:
       - movie-service
       - vector-service
+    networks:
+      - microservices-network
 
-  # API Gateway - Entry point
+  # ==========================
+  # API Gateway
+  # ==========================
   api-gateway:
     build:
       context: .
       dockerfile: api-gateway/Dockerfile
+    container_name: api-gateway
     ports:
       - "5000:5000"
     environment:
-      - FLASK_ENV=development
-      - DEBUG=True
-      - GATEWAY_PORT=5000
-      - MOVIE_SERVICE_URL=http://movie-service:5001
-      - RECOMMENDATION_SERVICE_URL=http://recommendation-service:5002
-      - VECTOR_SERVICE_URL=http://vector-service:5003
-      - GATEWAY_TEMPLATE_DIR=/app/templates
-      - GATEWAY_STATIC_DIR=/app/static
+      FLASK_ENV: development
+      DEBUG: "True"
+
+      GATEWAY_PORT: 5000
+      MOVIE_SERVICE_URL: http://movie-service:5001
+      VECTOR_SERVICE_URL: http://vector-service:5003
+      RECOMMENDATION_SERVICE_URL: http://recommendation-service:5002
+      USER_SERVICE_URL: http://user-service:5004
+
+      GATEWAY_TEMPLATE_DIR: /app/templates
+      GATEWAY_STATIC_DIR: /app/static
     volumes:
       - ../../web/templates:/app/templates
       - ../../web/static:/app/static
-    networks:
-      - microservices-network
     depends_on:
       - movie-service
-      - recommendation-service
       - vector-service
+      - recommendation-service
+      - user-service
+    networks:
+      - microservices-network
 
 networks:
   microservices-network:
     driver: bridge
+
+volumes:
+  movie-db-data:
+  user-db-data:

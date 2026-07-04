@@ -12,6 +12,7 @@ import os
 import sys
 import logging
 import re
+import requests
 from collections import Counter, defaultdict
 from functools import wraps
 from pathlib import Path
@@ -63,12 +64,12 @@ def handle_preflight():
 @app.route('/')
 def index():
     """Serve main page"""
-    return render_template('index.html')
+    return render_template('index.html', api_gateway_url='')
 
 @app.route('/movies/<movie_id>')
 def movie_detail_page(movie_id):
     """Serve the single-page app for direct movie-detail URLs"""
-    return render_template('index.html')
+    return render_template('index.html', api_gateway_url='')
 
 @app.route('/static/<path:path>')
 def serve_static(path):
@@ -92,7 +93,8 @@ def check_all_services():
     services = {
         'movie_service': f"{config.MOVIE_SERVICE_URL}/health",
         'recommendation_service': f"{config.RECOMMENDATION_SERVICE_URL}/health",
-        'vector_service': f"{config.VECTOR_SERVICE_URL}/health"
+        'vector_service': f"{config.VECTOR_SERVICE_URL}/health",
+        'user_service': f"{config.USER_SERVICE_URL}/health"
     }
     
     results = {}
@@ -110,6 +112,60 @@ def check_all_services():
             }
     
     return jsonify(results), 200
+
+# ==================== User Service Proxy ====================
+
+def proxy_user_request(path, method='POST'):
+    """Proxy auth/user requests while preserving downstream status codes."""
+    try:
+        url = f"{config.USER_SERVICE_URL}{path}"
+        headers = {}
+        if request.headers.get('Authorization'):
+            headers['Authorization'] = request.headers['Authorization']
+
+        response = requests.request(
+            method,
+            url,
+            json=request.get_json(silent=True),
+            headers=headers,
+            timeout=10,
+        )
+        return jsonify(response.json()), response.status_code
+    except requests.exceptions.RequestException as exc:
+        logger.error(f"User service request failed: {str(exc)}")
+        return jsonify({'error': 'User service unavailable'}), 503
+    except ValueError:
+        return jsonify({'error': 'Invalid response from user service'}), 502
+
+@app.route('/api/auth/register', methods=['POST'])
+def register_user():
+    return proxy_user_request('/api/auth/register', 'POST')
+
+@app.route('/api/auth/login', methods=['POST'])
+def login_user():
+    return proxy_user_request('/api/auth/login', 'POST')
+
+@app.route('/api/auth/verify', methods=['GET', 'POST'])
+def verify_user_token():
+    return proxy_user_request('/api/auth/verify', request.method)
+
+@app.route('/api/users/me', methods=['GET', 'PUT'])
+def get_current_user():
+    return proxy_user_request('/api/users/me', request.method)
+
+@app.route('/api/users/me/preferences', methods=['GET', 'PUT'])
+def get_current_user_preferences():
+    return proxy_user_request('/api/users/me/preferences', request.method)
+
+@app.route('/api/users/<int:user_id>/preferences', methods=['GET', 'PUT'])
+def get_user_preferences(user_id):
+    return proxy_user_request(f'/api/users/{user_id}/preferences', request.method)
+
+@app.route('/api/users/me/interactions/<action>', methods=['POST'])
+def track_user_interaction(action):
+    if action not in {'watch', 'rating'}:
+        return jsonify({'error': 'Unsupported user interaction'}), 404
+    return proxy_user_request(f'/api/users/me/interactions/{action}', 'POST')
 
 # ==================== Movie Service Proxy ====================
 
