@@ -33,6 +33,7 @@
                         <button id="openRegisterBtn" class="auth-btn primary">Đăng ký</button>
                     </div>
                     <div id="userActions" class="user-actions" style="display: none;">
+                        <button id="adminPanelBtn" class="auth-btn secondary admin-only-btn" style="display: none;">Quản trị phim</button>
                         <button id="profileBtn" class="profile-btn">
                             <span id="userInitial" class="user-initial">U</span>
                             <span id="userNameLabel">Tài khoản</span>
@@ -109,6 +110,7 @@
             <div class="tabs">
                 <button class="tab-btn active" data-tab="movies">Danh sách phim</button>
                 <button class="tab-btn" data-tab="visualization">Data Visualization</button>
+                <button id="adminTabBtn" class="tab-btn admin-only-btn" data-tab="admin" style="display: none;">Quản trị phim</button>
             </div>
         </div>
     </div>
@@ -118,11 +120,18 @@
         <div class="container">
             <!-- Movie List View -->
             <div id="movieListView" class="movie-list-view tab-content active">
-                <div id="similarMoviesHomeSection" class="similar-home-section">
-                    <h2 class="section-title">Phim tương tự</h2>
-                    <p id="similarHomeSource" class="similar-source"></p>
-                    <div id="similarMoviesHomeContainer" class="recommend-grid">
-                        <!-- Similar movies loaded here -->
+                <div id="trendingMoviesSection" class="home-section">
+                    <h2 class="section-title">Phim nổi bật</h2>
+                    <div id="trendingMoviesContainer" class="recommend-grid">
+                        <!-- Trending movies loaded here -->
+                    </div>
+                </div>
+
+                <div id="recommendedMoviesSection" class="home-section" style="display: none;">
+                    <h2 class="section-title">Phim đề xuất</h2>
+                    <p id="recommendedHomeSource" class="similar-source"></p>
+                    <div id="recommendedMoviesContainer" class="recommend-grid">
+                        <!-- Recommended movies loaded here -->
                     </div>
                 </div>
 
@@ -197,6 +206,94 @@
                         <h3 class="viz-title">Word Cloud</h3>
                         <div id="wordcloudContainer" style="width: 100%; height: 400px; position: relative;"></div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Admin View -->
+            <div id="adminView" class="admin-view tab-content" style="display: none;">
+                <div class="admin-header">
+                    <h2 class="section-title">Quản trị phim</h2>
+                    <button id="adminAddMovieBtn" class="auth-btn primary">Thêm phim mới</button>
+                </div>
+                <p id="adminMessage" class="auth-message" aria-live="polite"></p>
+
+                <div id="adminFormPanel" class="admin-form-panel" style="display: none;">
+                    <h3 id="adminFormTitle" class="admin-form-title">Thêm phim mới</h3>
+                    <form id="adminMovieForm" class="admin-form">
+                        <input type="hidden" id="adminEditingMovieId">
+                        <div class="admin-form-grid">
+                            <label>
+                                Movie ID *
+                                <input id="adminMovieId" type="text" required placeholder="tt1234567">
+                            </label>
+                            <label>
+                                Tên phim *
+                                <input id="adminMovieName" type="text" required>
+                            </label>
+                            <label>
+                                Năm
+                                <input id="adminYear" type="number" min="1800" max="2200">
+                            </label>
+                            <label>
+                                Rating
+                                <input id="adminRating" type="number" min="0" max="10" step="0.1">
+                            </label>
+                            <label>
+                                Thể loại
+                                <input id="adminGenre" type="text" placeholder="Action, Drama">
+                            </label>
+                            <label>
+                                Certificate
+                                <input id="adminCertificate" type="text" placeholder="PG-13">
+                            </label>
+                            <label>
+                                Runtime
+                                <input id="adminRuntime" type="text" placeholder="120 min">
+                            </label>
+                            <label>
+                                Votes
+                                <input id="adminVotes" type="number" min="0">
+                            </label>
+                            <label>
+                                Đạo diễn
+                                <input id="adminDirector" type="text">
+                            </label>
+                            <label>
+                                Diễn viên
+                                <input id="adminStar" type="text">
+                            </label>
+                            <label class="full-width">
+                                Poster URL
+                                <input id="adminPoster" type="url" placeholder="https://...">
+                            </label>
+                            <label class="full-width">
+                                Mô tả
+                                <textarea id="adminDescription" rows="4"></textarea>
+                            </label>
+                        </div>
+                        <div class="admin-form-actions">
+                            <button type="submit" class="auth-submit">Lưu phim</button>
+                            <button type="button" id="adminCancelFormBtn" class="auth-btn secondary">Hủy</button>
+                        </div>
+                    </form>
+                </div>
+
+                <div class="admin-table-wrap">
+                    <table class="admin-table">
+                        <thead>
+                            <tr>
+                                <th>ID</th>
+                                <th>Tên phim</th>
+                                <th>Năm</th>
+                                <th>Rating</th>
+                                <th>Thể loại</th>
+                                <th>Thao tác</th>
+                            </tr>
+                        </thead>
+                        <tbody id="adminMoviesTableBody">
+                            <tr><td colspan="6">Đang tải...</td></tr>
+                        </tbody>
+                    </table>
                 </div>
             </div>
         </div>

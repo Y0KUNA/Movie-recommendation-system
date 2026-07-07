@@ -1,72 +1,59 @@
 from flask import Flask, render_template, jsonify, request
-import csv
 import json
 import os
+import sys
 import math
 from collections import Counter, defaultdict
 import re
+import jwt
+
+sys.path.insert(0, os.path.dirname(__file__))
+from movie_db import MovieDatabase
 
 app = Flask(__name__)
 
-# Đọc dữ liệu từ CSV
-def load_movies():
-    movies = []
-    csv_file = 'web\imdb_movies_3000.csv'
-    
-    if not os.path.exists(csv_file):
-        return movies
-    
-    try:
-        with open(csv_file, 'r', encoding='utf-8') as f:
-            reader = csv.DictReader(f)
-            
-            for row in reader:
-                # Làm sạch dữ liệu
-                def clean_field(value):
-                    if not value or value.strip() == '':
-                        return None
-                    return value.strip()
-                
-                movie = {
-                    'movie_id': clean_field(row.get('movie_id', '')),
-                    'movie_name': clean_field(row.get('movie_name', '')),
-                    'year': clean_field(row.get('year', '')),
-                    'certificate': clean_field(row.get('certificate', '')),
-                    'runtime': clean_field(row.get('runtime', '')),
-                    'genre': clean_field(row.get('genre', '')),
-                    'rating': clean_field(row.get('rating', '')),
-                    'description': clean_field(row.get('description', '')),
-                    'director': clean_field(row.get('director', '')),
-                    'director_id': clean_field(row.get('director_id', '')),
-                    'star': clean_field(row.get('star', '')),
-                    'star_id': clean_field(row.get('star_id', '')),
-                    'votes': clean_field(row.get('votes', '')),
-                    'gross': clean_field(row.get('gross(in $)', '')),
-                    'poster': clean_field(row.get('poster', ''))
-                }
-                # Chỉ thêm phim nếu có movie_id
-                if movie['movie_id']:
-                    movies.append(movie)
-        print("Loaded movies:", len(movies))
+JWT_SECRET = os.getenv('JWT_SECRET', 'dev-user-service-secret')
+JWT_ALGORITHM = os.getenv('JWT_ALGORITHM', 'HS256')
 
-    except Exception as e:
-        print(f"Error reading CSV: {e}")
-        import traceback
-        traceback.print_exc()
-    
-    return movies
-
-# Cache dữ liệu
+movie_db = MovieDatabase()
 movies_data = None
+content_vectors_cache = None
+
+
+def invalidate_movie_cache():
+    global movies_data, content_vectors_cache
+    movies_data = None
+    content_vectors_cache = None
+
 
 def get_movies():
     global movies_data
     if movies_data is None:
-        movies_data = load_movies()
+        movies_data = movie_db.get_all_movies()
+        print('Loaded movies:', len(movies_data))
     return movies_data
 
-# --- Content-based similarity ---
-content_vectors_cache = None
+
+def get_bearer_token():
+    auth_header = request.headers.get('Authorization', '')
+    if auth_header.lower().startswith('bearer '):
+        return auth_header.split(' ', 1)[1].strip()
+    return None
+
+
+def require_admin():
+    token = get_bearer_token()
+    if not token:
+        return jsonify({'error': 'Authorization Bearer token is required'}), 401
+    try:
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+    except jwt.ExpiredSignatureError:
+        return jsonify({'error': 'token expired'}), 401
+    except jwt.InvalidTokenError:
+        return jsonify({'error': 'token invalid'}), 401
+    if payload.get('role') != 'admin':
+        return jsonify({'error': 'Admin access required'}), 403
+    return None
 
 def _tokens_for_movie(m):
     parts = []
@@ -206,6 +193,49 @@ def get_movies_api():
         'per_page': per_page,
         'total_pages': (total + per_page - 1) // per_page
     })
+
+
+@app.route('/api/movies', methods=['POST'])
+def create_movie_api():
+    error_response = require_admin()
+    if error_response:
+        return error_response
+
+    data = request.get_json(silent=True) or {}
+    try:
+        movie = movie_db.create_movie(data)
+        invalidate_movie_cache()
+        return jsonify({'message': 'Movie created', 'movie': movie}), 201
+    except ValueError as exc:
+        return jsonify({'error': str(exc)}), 400
+    except Exception as exc:
+        return jsonify({'error': str(exc)}), 500
+
+
+@app.route('/api/movies/<movie_id>', methods=['PUT'])
+def update_movie_api(movie_id):
+    error_response = require_admin()
+    if error_response:
+        return error_response
+
+    data = request.get_json(silent=True) or {}
+    movie = movie_db.update_movie(movie_id, data)
+    if not movie:
+        return jsonify({'error': 'Movie not found'}), 404
+    invalidate_movie_cache()
+    return jsonify({'message': 'Movie updated', 'movie': movie}), 200
+
+
+@app.route('/api/movies/<movie_id>', methods=['DELETE'])
+def delete_movie_api(movie_id):
+    error_response = require_admin()
+    if error_response:
+        return error_response
+
+    if not movie_db.delete_movie(movie_id):
+        return jsonify({'error': 'Movie not found'}), 404
+    invalidate_movie_cache()
+    return jsonify({'message': 'Movie deleted'}), 200
 
 
 @app.route('/api/movies/<movie_id>')

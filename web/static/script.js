@@ -28,8 +28,10 @@ const pageInfo = document.getElementById('pageInfo');
 const loadingSpinner = document.getElementById('loadingSpinner');
 const visualizationView = document.getElementById('visualizationView');
 const tabButtons = document.querySelectorAll('.tab-btn');
-const similarMoviesHomeContainer = document.getElementById('similarMoviesHomeContainer');
-const similarHomeSource = document.getElementById('similarHomeSource');
+const trendingMoviesContainer = document.getElementById('trendingMoviesContainer');
+const recommendedMoviesSection = document.getElementById('recommendedMoviesSection');
+const recommendedMoviesContainer = document.getElementById('recommendedMoviesContainer');
+const recommendedHomeSource = document.getElementById('recommendedHomeSource');
 const similarMoviesSection = document.getElementById('similarMoviesSection');
 const similarMoviesContainer = document.getElementById('similarMoviesContainer');
 const guestActions = document.getElementById('guestActions');
@@ -50,10 +52,22 @@ const loginForm = document.getElementById('loginForm');
 const registerForm = document.getElementById('registerForm');
 const profileForm = document.getElementById('profileForm');
 const authMessage = document.getElementById('authMessage');
+const adminTabBtn = document.getElementById('adminTabBtn');
+const adminPanelBtn = document.getElementById('adminPanelBtn');
+const adminView = document.getElementById('adminView');
+const adminAddMovieBtn = document.getElementById('adminAddMovieBtn');
+const adminFormPanel = document.getElementById('adminFormPanel');
+const adminFormTitle = document.getElementById('adminFormTitle');
+const adminMovieForm = document.getElementById('adminMovieForm');
+const adminCancelFormBtn = document.getElementById('adminCancelFormBtn');
+const adminMoviesTableBody = document.getElementById('adminMoviesTableBody');
+const adminMessage = document.getElementById('adminMessage');
+
+let adminMoviesCache = [];
 
 // Initialize
-document.addEventListener('DOMContentLoaded', () => {
-    initializeAuth();
+document.addEventListener('DOMContentLoaded', async () => {
+    await initializeAuth();
 
     // set initial search field from select (in case default changed)
     if (searchFieldSelect && searchFieldSelect.value) {
@@ -65,7 +79,7 @@ document.addEventListener('DOMContentLoaded', () => {
         showMovieDetail(initialMovieId, false);
     } else {
         loadMovies();
-        loadFeaturedSimilarMovies();
+        loadHomePageSections();
     }
 
     // Event listeners
@@ -102,6 +116,11 @@ document.addEventListener('DOMContentLoaded', () => {
     loginForm?.addEventListener('submit', handleLogin);
     registerForm?.addEventListener('submit', handleRegister);
     profileForm?.addEventListener('submit', handleProfileUpdate);
+    adminPanelBtn?.addEventListener('click', () => switchTab('admin'));
+    adminAddMovieBtn?.addEventListener('click', () => openAdminMovieForm('create'));
+    adminCancelFormBtn?.addEventListener('click', closeAdminMovieForm);
+    adminMovieForm?.addEventListener('submit', handleAdminMovieSubmit);
+    adminMoviesTableBody?.addEventListener('click', handleAdminTableAction);
 
     // Tab switching
     tabButtons.forEach(btn => {
@@ -157,7 +176,16 @@ async function authRequest(url, options = {}) {
     return data;
 }
 
+function isAdminUser() {
+    return currentUser?.role === 'admin';
+}
+
 function renderAuthState() {
+    const adminVisible = isAdminUser();
+    document.querySelectorAll('.admin-only-btn').forEach((button) => {
+        button.style.display = adminVisible ? '' : 'none';
+    });
+
     if (currentUser) {
         guestActions.style.display = 'none';
         userActions.style.display = 'flex';
@@ -169,6 +197,9 @@ function renderAuthState() {
         userActions.style.display = 'none';
         userNameLabel.textContent = 'Tài khoản';
         userInitial.textContent = 'U';
+        if (adminView?.classList.contains('active')) {
+            switchTab('movies');
+        }
     }
 }
 
@@ -274,12 +305,18 @@ function applyAuthenticatedUser(data) {
     currentUser = data.user;
     localStorage.setItem('authToken', authToken);
     renderAuthState();
+    if (!getMovieIdFromPath() && movieListView.style.display !== 'none') {
+        loadHomeRecommendations();
+    }
 }
 
 function logout() {
     clearAuthState();
     renderAuthState();
     closeAuthModal();
+    if (!getMovieIdFromPath() && movieListView.style.display !== 'none') {
+        loadHomeRecommendations();
+    }
 }
 
 function clearAuthState() {
@@ -328,38 +365,49 @@ function requireLoginForTracking() {
 }
 
 async function trackMovieView(movie) {
-    if (!requireLoginForTracking()) return;
-
+    const button = document.getElementById('markWatchedBtn');
     const movieId = getTrackableMovieId(movie);
     if (!movieId) {
         setMovieTrackingMessage('Không xác định được mã phim.', true);
         return;
     }
 
-    const button = document.getElementById('markWatchedBtn');
-    if (button) {
-        button.disabled = true;
-        button.textContent = 'Đang lưu...';
-    }
-    setMovieTrackingMessage('Đang lưu phim đã xem...');
+    if (currentUser && authToken) {
+        if (button) {
+            button.disabled = true;
+            button.textContent = 'Đang lưu...';
+        }
+        setMovieTrackingMessage('Đang lưu phim đã xem...');
 
-    try {
-        await authRequest('/api/users/me/interactions/watch', {
-            method: 'POST',
-            body: JSON.stringify({
-                ...getMovieInteractionPayload(movie),
-                watchedAt: new Date().toISOString()
-            })
+        try {
+            await authRequest('/api/users/me/interactions/watch', {
+                method: 'POST',
+                body: JSON.stringify({
+                    ...getMovieInteractionPayload(movie),
+                    watchedAt: new Date().toISOString()
+                })
+            });
+            setMovieTrackingMessage('Đã lưu vào lịch sử xem và cập nhật sở thích của bạn.');
+            if (button) {
+                button.textContent = 'Đã xem';
+            }
+        } catch (error) {
+            setMovieTrackingMessage(error.message, true);
+            if (button) {
+                button.disabled = false;
+                button.textContent = 'Xem';
+            }
+        }
+    } else {
+        const watchedMovies = getLocalWatchedMovies();
+        watchedMovies.push({
+            ...getMovieInteractionPayload(movie),
+            watchedAt: new Date().toISOString()
         });
-        setMovieTrackingMessage('Đã lưu vào lịch sử xem và cập nhật sở thích của bạn.');
+        localStorage.setItem('watchedMovies', JSON.stringify(watchedMovies));
+        setMovieTrackingMessage('Đã lưu lịch sử xem trên thiết bị.');
         if (button) {
             button.textContent = 'Đã xem';
-        }
-    } catch (error) {
-        setMovieTrackingMessage(error.message, true);
-        if (button) {
-            button.disabled = false;
-            button.textContent = 'Xem';
         }
     }
 }
@@ -417,7 +465,7 @@ async function loadMovies(page = 1, search = '', field = 'movie_name') {
         currentSearch = search;
         currentSearchField = field;
 
-        displayMovies(data.movies);
+        displayMovies(data.movies || data.data || []);
         updatePagination();
     } catch (error) {
         console.error('Error loading movies:', error);
@@ -587,8 +635,8 @@ function showMovieList() {
         similarMoviesSection.style.display = 'none';
     }
 
-    // ⭐ Restore URL back to homepage
     history.pushState({}, "", "/");
+    loadHomeRecommendations();
 }
 
 function getMovieIdFromPath() {
@@ -596,32 +644,134 @@ function getMovieIdFromPath() {
     return match ? decodeURIComponent(match[1]) : null;
 }
 
-async function loadFeaturedSimilarMovies(topN = 8) {
-    if (!similarMoviesHomeContainer) return;
-    similarMoviesHomeContainer.innerHTML = '<p class="loading-inline">Đang tải phim tương tự...</p>';
+function getLocalWatchedMovies() {
     try {
-        // Use System API endpoints:
-        // 1) pick a seed movie from the movie API
-        // 2) fetch similar movies from recommendation API
-        const seedResp = await fetch(apiUrl('/api/movies?page=1&per_page=1'));
-        const seedData = await seedResp.json();
-        const seedMovie = (seedData.movies && seedData.movies[0]) ? seedData.movies[0] : null;
+        return JSON.parse(localStorage.getItem('watchedMovies')) || [];
+    } catch {
+        return [];
+    }
+}
 
-        if (!seedMovie || !seedMovie.movie_id) {
-            similarMoviesHomeContainer.innerHTML = '<p style="color: var(--text-secondary);">Không có dữ liệu phim.</p>';
+function getLocalWatchedMovieIds() {
+    const watched = getLocalWatchedMovies();
+    const seen = new Set();
+    const ids = [];
+    for (let i = watched.length - 1; i >= 0; i -= 1) {
+        const id = watched[i].movieId;
+        if (id && !seen.has(id)) {
+            seen.add(id);
+            ids.push(id);
+        }
+    }
+    return ids;
+}
+
+function loadHomePageSections() {
+    loadTrendingMovies();
+    loadHomeRecommendations();
+}
+
+async function loadTrendingMovies(topN = 8) {
+    if (!trendingMoviesContainer) return;
+    trendingMoviesContainer.innerHTML = '<p class="loading-inline">Đang tải phim nổi bật...</p>';
+    try {
+        const response = await fetch(apiUrl(`/api/recommendations/trending?top_k=${topN}`));
+        const data = await response.json();
+        renderSimilarMovies(data.recommendations || [], trendingMoviesContainer, { showScore: false });
+    } catch (error) {
+        console.error('Error loading trending movies:', error);
+        trendingMoviesContainer.innerHTML = '<p style="color: var(--text-secondary);">Không thể tải phim nổi bật.</p>';
+    }
+}
+
+async function loadRecommendationsByGenres(genres, topN = 8) {
+    const seen = new Set();
+    const results = [];
+    const genresToUse = genres.slice(0, 3);
+
+    for (const genre of genresToUse) {
+        const response = await fetch(apiUrl(
+            `/api/movies/search/by-genre?genre=${encodeURIComponent(genre)}&per_page=${topN + 5}`
+        ));
+        const data = await response.json();
+        const movies = data.data || data.movies || [];
+        for (const movie of movies) {
+            if (movie.movie_id && !seen.has(movie.movie_id)) {
+                seen.add(movie.movie_id);
+                results.push(movie);
+            }
+        }
+    }
+
+    return results.slice(0, topN);
+}
+
+async function loadRecommendationsFromWatched(topN = 8) {
+    const watchedIds = getLocalWatchedMovieIds();
+    if (watchedIds.length === 0) {
+        return [];
+    }
+
+    const response = await fetch(apiUrl('/api/recommendations/personalized'), {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            liked_movies: watchedIds,
+            top_k: topN
+        })
+    });
+    const data = await response.json();
+    if (!response.ok) {
+        throw new Error(data.error || 'Không thể tải phim đề xuất');
+    }
+    return data.recommendations || [];
+}
+
+async function loadHomeRecommendations(topN = 8) {
+    if (!recommendedMoviesSection || !recommendedMoviesContainer) return;
+
+    try {
+        let movies = [];
+        let sourceText = '';
+
+        if (currentUser && authToken) {
+            const prefData = await authRequest('/api/users/me/preferences');
+            const genres = prefData.preferences?.favoriteGenres || [];
+            if (genres.length === 0) {
+                recommendedMoviesSection.style.display = 'none';
+                return;
+            }
+
+            recommendedMoviesSection.style.display = 'block';
+            recommendedMoviesContainer.innerHTML = '<p class="loading-inline">Đang tải phim đề xuất...</p>';
+            sourceText = `Dựa trên thể loại yêu thích: ${genres.slice(0, 3).join(', ')}`;
+            movies = await loadRecommendationsByGenres(genres, topN);
+        } else {
+            const watchedIds = getLocalWatchedMovieIds();
+            if (watchedIds.length === 0) {
+                recommendedMoviesSection.style.display = 'none';
+                return;
+            }
+
+            recommendedMoviesSection.style.display = 'block';
+            recommendedMoviesContainer.innerHTML = '<p class="loading-inline">Đang tải phim đề xuất...</p>';
+            sourceText = `Dựa trên ${watchedIds.length} phim bạn đã xem trên thiết bị`;
+            movies = await loadRecommendationsFromWatched(topN);
+        }
+
+        if (recommendedHomeSource) {
+            recommendedHomeSource.textContent = sourceText;
+        }
+
+        if (!movies.length) {
+            recommendedMoviesSection.style.display = 'none';
             return;
         }
 
-        if (similarHomeSource) {
-            similarHomeSource.textContent = `Gợi ý dựa trên: ${seedMovie.movie_name || 'N/A'}`;
-        }
-
-        const response = await fetch(apiUrl(`/api/recommendations/similar?movie_id=${encodeURIComponent(seedMovie.movie_id)}&method=hybrid&top_k=${topN}`));
-        const data = await response.json();
-        renderSimilarMovies(data.recommendations || [], similarMoviesHomeContainer);
+        renderSimilarMovies(movies, recommendedMoviesContainer, { showScore: Boolean(currentUser && authToken) });
     } catch (error) {
-        console.error('Error loading featured similar movies:', error);
-        similarMoviesHomeContainer.innerHTML = '<p style="color: var(--text-secondary);">Không thể tải phim tương tự.</p>';
+        console.error('Error loading home recommendations:', error);
+        recommendedMoviesSection.style.display = 'none';
     }
 }
 
@@ -646,7 +796,8 @@ async function loadSimilarRecommendations(movieId, topN = 10) {
     }
 }
 
-function renderSimilarMovies(movies, container) {
+function renderSimilarMovies(movies, container, options = {}) {
+    const showScore = options.showScore !== false;
     if (!container) return;
     if (!movies || movies.length === 0) {
         container.innerHTML = '<p style="color: var(--text-secondary);">Không có phim tương tự.</p>';
@@ -657,7 +808,7 @@ function renderSimilarMovies(movies, container) {
             ? `<img src="${escapeHtml(movie.poster)}" alt="Poster ${escapeHtml(movie.movie_name || '')}" loading="lazy" onerror="handlePosterError(event)">`
             : '';
         const similarityValue = (typeof movie.similarity_score === 'number') ? movie.similarity_score : movie.score;
-        const scoreDisplay = typeof similarityValue === 'number'
+        const scoreDisplay = showScore && typeof similarityValue === 'number'
             ? `Độ tương đồng: ${similarityValue.toFixed(2)}`
             : '';
         return `
@@ -760,27 +911,179 @@ window.addEventListener("popstate", (event) => {
 
 // Tab switching
 function switchTab(tabName) {
-    // Update tab buttons
     tabButtons.forEach(btn => {
-        if (btn.getAttribute('data-tab') === tabName) {
-            btn.classList.add('active');
-        } else {
-            btn.classList.remove('active');
-        }
+        btn.classList.toggle('active', btn.getAttribute('data-tab') === tabName);
     });
 
-    // Show/hide content
+    movieListView.classList.remove('active');
+    visualizationView.classList.remove('active');
+    adminView?.classList.remove('active');
+    movieListView.style.display = 'none';
+    visualizationView.style.display = 'none';
+    if (adminView) adminView.style.display = 'none';
+    movieDetailView.style.display = 'none';
+
     if (tabName === 'movies') {
         movieListView.classList.add('active');
-        visualizationView.classList.remove('active');
-        visualizationView.style.display = 'none';
-        movieDetailView.style.display = 'none';
+        movieListView.style.display = 'block';
     } else if (tabName === 'visualization') {
-        movieListView.classList.remove('active');
-        movieDetailView.style.display = 'none';
         visualizationView.classList.add('active');
         visualizationView.style.display = 'block';
         loadVisualizations();
+    } else if (tabName === 'admin') {
+        if (!isAdminUser()) {
+            switchTab('movies');
+            return;
+        }
+        adminView.classList.add('active');
+        adminView.style.display = 'block';
+        loadAdminMovies();
+    }
+}
+
+function setAdminMessage(message, isError = false) {
+    if (!adminMessage) return;
+    adminMessage.textContent = message;
+    adminMessage.classList.toggle('error', isError);
+}
+
+async function loadAdminMovies() {
+    if (!isAdminUser()) return;
+
+    adminMoviesTableBody.innerHTML = '<tr><td colspan="6">Đang tải...</td></tr>';
+    try {
+        const response = await authRequest('/api/movies?page=1&per_page=100');
+        adminMoviesCache = response.movies || response.data || [];
+        renderAdminMoviesTable();
+    } catch (error) {
+        adminMoviesTableBody.innerHTML = `<tr><td colspan="6">${escapeHtml(error.message)}</td></tr>`;
+    }
+}
+
+function renderAdminMoviesTable() {
+    if (!adminMoviesCache.length) {
+        adminMoviesTableBody.innerHTML = '<tr><td colspan="6">Chưa có phim nào.</td></tr>';
+        return;
+    }
+
+    adminMoviesTableBody.innerHTML = adminMoviesCache.map((movie) => `
+        <tr>
+            <td>${escapeHtml(movie.movie_id || '')}</td>
+            <td>${escapeHtml(movie.movie_name || '')}</td>
+            <td>${escapeHtml(movie.year || '')}</td>
+            <td>${escapeHtml(movie.rating || '')}</td>
+            <td>${escapeHtml(movie.genre || '')}</td>
+            <td class="admin-actions">
+                <button type="button" class="auth-btn secondary" data-admin-action="edit" data-movie-id="${escapeHtml(movie.movie_id || '')}">Sửa</button>
+                <button type="button" class="auth-btn secondary danger" data-admin-action="delete" data-movie-id="${escapeHtml(movie.movie_id || '')}">Xóa</button>
+            </td>
+        </tr>
+    `).join('');
+}
+
+function openAdminMovieForm(mode, movie = null) {
+    adminFormPanel.style.display = 'block';
+    adminFormTitle.textContent = mode === 'edit' ? 'Sửa thông tin phim' : 'Thêm phim mới';
+    document.getElementById('adminEditingMovieId').value = mode === 'edit' ? (movie?.movie_id || '') : '';
+    document.getElementById('adminMovieId').value = movie?.movie_id || '';
+    document.getElementById('adminMovieId').readOnly = mode === 'edit';
+    document.getElementById('adminMovieName').value = movie?.movie_name || '';
+    document.getElementById('adminYear').value = movie?.year || '';
+    document.getElementById('adminRating').value = movie?.rating || '';
+    document.getElementById('adminGenre').value = movie?.genre || '';
+    document.getElementById('adminCertificate').value = movie?.certificate || '';
+    document.getElementById('adminRuntime').value = movie?.runtime || '';
+    document.getElementById('adminVotes').value = movie?.votes || '';
+    document.getElementById('adminDirector').value = movie?.director || '';
+    document.getElementById('adminStar').value = movie?.star || '';
+    document.getElementById('adminPoster').value = movie?.poster || '';
+    document.getElementById('adminDescription').value = movie?.description || '';
+    setAdminMessage('');
+}
+
+function closeAdminMovieForm() {
+    adminFormPanel.style.display = 'none';
+    adminMovieForm.reset();
+    document.getElementById('adminMovieId').readOnly = false;
+    document.getElementById('adminEditingMovieId').value = '';
+}
+
+function collectAdminMoviePayload() {
+    return {
+        movie_id: document.getElementById('adminMovieId').value.trim(),
+        movie_name: document.getElementById('adminMovieName').value.trim(),
+        year: document.getElementById('adminYear').value.trim(),
+        rating: document.getElementById('adminRating').value.trim(),
+        genre: document.getElementById('adminGenre').value.trim(),
+        certificate: document.getElementById('adminCertificate').value.trim(),
+        runtime: document.getElementById('adminRuntime').value.trim(),
+        votes: document.getElementById('adminVotes').value.trim(),
+        director: document.getElementById('adminDirector').value.trim(),
+        star: document.getElementById('adminStar').value.trim(),
+        poster: document.getElementById('adminPoster').value.trim(),
+        description: document.getElementById('adminDescription').value.trim(),
+    };
+}
+
+async function handleAdminMovieSubmit(event) {
+    event.preventDefault();
+    if (!isAdminUser()) return;
+
+    const editingMovieId = document.getElementById('adminEditingMovieId').value.trim();
+    const payload = collectAdminMoviePayload();
+
+    try {
+        if (editingMovieId) {
+            await authRequest(`/api/movies/${encodeURIComponent(editingMovieId)}`, {
+                method: 'PUT',
+                body: JSON.stringify(payload),
+            });
+            setAdminMessage('Đã cập nhật phim.');
+        } else {
+            await authRequest('/api/movies', {
+                method: 'POST',
+                body: JSON.stringify(payload),
+            });
+            setAdminMessage('Đã thêm phim mới.');
+        }
+
+        closeAdminMovieForm();
+        await loadAdminMovies();
+        if (movieListView.style.display !== 'none') {
+            loadMovies(currentPage, currentSearch, currentSearchField);
+        }
+    } catch (error) {
+        setAdminMessage(error.message, true);
+    }
+}
+
+async function handleAdminTableAction(event) {
+    const button = event.target.closest('[data-admin-action]');
+    if (!button || !isAdminUser()) return;
+
+    const movieId = button.dataset.movieId;
+    const action = button.dataset.adminAction;
+    const movie = adminMoviesCache.find((item) => item.movie_id === movieId);
+
+    if (action === 'edit' && movie) {
+        openAdminMovieForm('edit', movie);
+        return;
+    }
+
+    if (action === 'delete') {
+        const confirmed = window.confirm(`Xóa phim "${movie?.movie_name || movieId}"?`);
+        if (!confirmed) return;
+
+        try {
+            await authRequest(`/api/movies/${encodeURIComponent(movieId)}`, { method: 'DELETE' });
+            setAdminMessage('Đã xóa phim.');
+            await loadAdminMovies();
+            if (movieListView.style.display !== 'none') {
+                loadMovies(currentPage, currentSearch, currentSearchField);
+            }
+        } catch (error) {
+            setAdminMessage(error.message, true);
+        }
     }
 }
 
@@ -811,7 +1114,7 @@ async function loadRatingDistribution() {
         const data = await response.json();
 
         const ctx = document.getElementById('ratingChart').getContext('2d');
-        
+
         // Destroy existing chart if it exists
         if (charts.rating) {
             charts.rating.destroy();
@@ -879,7 +1182,7 @@ async function loadTopMovies() {
         const data = await response.json();
 
         const ctx = document.getElementById('topMoviesChart').getContext('2d');
-        
+
         if (charts.topMovies) {
             charts.topMovies.destroy();
         }
@@ -946,7 +1249,7 @@ async function loadTopGenres() {
         const data = await response.json();
 
         const ctx = document.getElementById('topGenresChart').getContext('2d');
-        
+
         if (charts.topGenres) {
             charts.topGenres.destroy();
         }
@@ -1009,14 +1312,14 @@ async function loadHeatmap() {
         const data = await response.json();
 
         const ctx = document.getElementById('heatmapChart').getContext('2d');
-        
+
         if (charts.heatmap) {
             charts.heatmap.destroy();
         }
 
         // Sample data for better visualization (show last 30 years)
         const recentData = data.slice(-30);
-        
+
         charts.heatmap = new Chart(ctx, {
             type: 'line',
             data: {
@@ -1084,7 +1387,7 @@ async function loadBarChart() {
         const data = await response.json();
 
         const ctx = document.getElementById('barChart').getContext('2d');
-        
+
         if (charts.barChart) {
             charts.barChart.destroy();
         }
@@ -1151,7 +1454,7 @@ async function loadHistogram() {
         const data = await response.json();
 
         const ctx = document.getElementById('histogramChart').getContext('2d');
-        
+
         if (charts.histogram) {
             charts.histogram.destroy();
         }

@@ -48,6 +48,7 @@ def make_token(user):
         'sub': str(user.id),
         'username': user.username,
         'email': user.email,
+        'role': user.role,
         'iat': now,
         'exp': now + timedelta(hours=JWT_EXPIRES_HOURS),
     }

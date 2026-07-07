@@ -22,9 +22,18 @@ class Config:
     # Data paths
     MOVIES_CSV = os.getenv('MOVIES_CSV', '../data/imdb_movies_3000.csv')
     MOVIE_VECTORS_NPZ = os.getenv('MOVIE_VECTORS_NPZ', '../data/movie_vectors.npz')
+
+    # Movie database
+    DB_HOST = os.getenv('DB_HOST', 'localhost')
+    DB_PORT = int(os.getenv('DB_PORT', 5433))
+    DB_NAME = os.getenv('DB_NAME', 'movie_db')
+    DB_USER = os.getenv('DB_USER', 'postgres')
+    DB_PASSWORD = os.getenv('DB_PASSWORD', 'postgres')
+
+    # Vector store
+    CHROMA_PERSIST_DIR = os.getenv('CHROMA_PERSIST_DIR', './chroma_data')
+    EMBEDDING_MODEL = os.getenv('EMBEDDING_MODEL', 'all-MiniLM-L6-v2')
     
-    # ML Model
-    EMBEDDING_MODEL = 'all-MiniLM-L6-v2'
 
 class DevelopmentConfig(Config):
     """Development configuration"""

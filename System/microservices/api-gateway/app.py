@@ -169,6 +169,36 @@ def track_user_interaction(action):
 
 # ==================== Movie Service Proxy ====================
 
+def proxy_movie_request(path, method='GET'):
+    """Proxy movie requests while preserving auth headers."""
+    try:
+        url = f"{config.MOVIE_SERVICE_URL}{path}"
+        headers = {}
+        if request.headers.get('Authorization'):
+            headers['Authorization'] = request.headers['Authorization']
+
+        kwargs = {
+            'method': method,
+            'url': url,
+            'headers': headers,
+            'timeout': 10,
+        }
+        if method in {'POST', 'PUT', 'PATCH'}:
+            kwargs['json'] = request.get_json(silent=True)
+        elif method == 'GET':
+            kwargs['params'] = request.args
+
+        response = requests.request(**kwargs)
+        payload = response.json()
+        if method == 'GET' and isinstance(payload, dict) and 'data' in payload and 'movies' not in payload:
+            payload['movies'] = payload['data']
+        return jsonify(payload), response.status_code
+    except requests.exceptions.RequestException as exc:
+        logger.error(f"Movie service request failed: {str(exc)}")
+        return jsonify({'error': 'Movie service unavailable'}), 503
+    except ValueError:
+        return jsonify({'error': 'Invalid response from movie service'}), 502
+
 @app.route('/api/movies', methods=['GET'])
 def get_movies():
     """Get movies (proxy to Movie Service)"""
@@ -204,6 +234,10 @@ def get_movies():
         logger.error(f"Error in get_movies: {str(e)}")
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/movies', methods=['POST'])
+def create_movie():
+    return proxy_movie_request('/api/movies', 'POST')
+
 @app.route('/api/movies/<movie_id>', methods=['GET'])
 def get_movie_detail(movie_id):
     """Get movie detail (proxy to Movie Service)"""
@@ -219,6 +253,14 @@ def get_movie_detail(movie_id):
     except Exception as e:
         logger.error(f"Error in get_movie_detail: {str(e)}")
         return jsonify({'error': str(e)}), 500
+
+@app.route('/api/movies/<movie_id>', methods=['PUT'])
+def update_movie(movie_id):
+    return proxy_movie_request(f'/api/movies/{movie_id}', 'PUT')
+
+@app.route('/api/movies/<movie_id>', methods=['DELETE'])
+def delete_movie(movie_id):
+    return proxy_movie_request(f'/api/movies/{movie_id}', 'DELETE')
 
 @app.route('/api/movies/search/by-genre', methods=['GET'])
 def search_by_genre():

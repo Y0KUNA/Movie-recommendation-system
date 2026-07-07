@@ -43,6 +43,7 @@ class User:
     username: str
     email: str
     full_name: Optional[str]
+    role: str
     created_at: datetime
     updated_at: datetime
 
@@ -52,6 +53,7 @@ class User:
             'username': self.username,
             'email': self.email,
             'full_name': self.full_name,
+            'role': self.role,
             'created_at': self.created_at.isoformat() if self.created_at else None,
             'updated_at': self.updated_at.isoformat() if self.updated_at else None,
         }
@@ -119,20 +121,69 @@ class UserRepository:
                     ON users (LOWER(username));
                     """
                 )
+                cursor.execute(
+                    """
+                    ALTER TABLE users
+                    ADD COLUMN IF NOT EXISTS role VARCHAR(20) NOT NULL DEFAULT 'user';
+                    """
+                )
             conn.commit()
+        self._ensure_default_admin()
 
-    def create_user(self, username: str, email: str, password: str, full_name: Optional[str] = None) -> User:
+    def _ensure_default_admin(self):
+        admin_username = os.getenv('ADMIN_USERNAME', 'admin')
+        admin_email = os.getenv('ADMIN_EMAIL', 'admin@moviedb.local')
+        admin_password = os.getenv('ADMIN_PASSWORD', 'admin123')
+        admin_full_name = os.getenv('ADMIN_FULL_NAME', 'System Admin')
+
+        with self._connect() as conn:
+            with conn.cursor() as cursor:
+                cursor.execute("SELECT id FROM users WHERE role = 'admin' LIMIT 1;")
+                if cursor.fetchone():
+                    return
+
+        try:
+            self.create_user(
+                username=admin_username,
+                email=admin_email,
+                password=admin_password,
+                full_name=admin_full_name,
+                role='admin',
+            )
+            logger.info('Default admin account created: %s', admin_username)
+        except DuplicateUserError:
+            with self._connect() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute(
+                        """
+                        UPDATE users
+                        SET role = 'admin', updated_at = NOW()
+                        WHERE LOWER(username) = LOWER(%s) OR LOWER(email) = LOWER(%s);
+                        """,
+                        (admin_username, admin_email),
+                    )
+                conn.commit()
+            logger.info('Promoted existing account to admin: %s', admin_username)
+
+    def create_user(
+        self,
+        username: str,
+        email: str,
+        password: str,
+        full_name: Optional[str] = None,
+        role: str = 'user',
+    ) -> User:
         password_hash = generate_password_hash(password)
         try:
             with self._connect() as conn:
                 with conn.cursor(cursor_factory=RealDictCursor) as cursor:
                     cursor.execute(
                         """
-                        INSERT INTO users (username, email, password_hash, full_name)
-                        VALUES (%s, %s, %s, %s)
-                        RETURNING id, username, email, full_name, created_at, updated_at;
+                        INSERT INTO users (username, email, password_hash, full_name, role)
+                        VALUES (%s, %s, %s, %s, %s)
+                        RETURNING id, username, email, full_name, role, created_at, updated_at;
                         """,
-                        (username, email, password_hash, full_name),
+                        (username, email, password_hash, full_name, role),
                     )
                     row = cursor.fetchone()
                 conn.commit()
@@ -145,7 +196,7 @@ class UserRepository:
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 cursor.execute(
                     """
-                    SELECT id, username, email, full_name, created_at, updated_at
+                    SELECT id, username, email, full_name, role, created_at, updated_at
                     FROM users
                     WHERE id = %s;
                     """,
@@ -166,7 +217,7 @@ class UserRepository:
                             full_name = %s,
                             updated_at = NOW()
                         WHERE id = %s
-                        RETURNING id, username, email, full_name, created_at, updated_at;
+                        RETURNING id, username, email, full_name, role, created_at, updated_at;
                         """,
                         (username, email, full_name, user_id),
                     )
@@ -182,7 +233,7 @@ class UserRepository:
             with conn.cursor(cursor_factory=RealDictCursor) as cursor:
                 cursor.execute(
                     """
-                    SELECT id, username, email, password_hash, full_name, created_at, updated_at
+                    SELECT id, username, email, password_hash, full_name, role, created_at, updated_at
                     FROM users
                     WHERE LOWER(email) = LOWER(%s) OR LOWER(username) = LOWER(%s);
                     """,
@@ -202,6 +253,7 @@ class UserRepository:
             username=row['username'],
             email=row['email'],
             full_name=row.get('full_name'),
+            role=row.get('role') or 'user',
             created_at=row['created_at'],
             updated_at=row['updated_at'],
         )

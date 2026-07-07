@@ -35,12 +35,14 @@ services:
 
       MOVIE_SERVICE_PORT: 5001
       MOVIES_CSV: /app/data/imdb_movies_3000.csv
+      JWT_SECRET: ${JWT_SECRET:-dev-user-service-secret}
 
       DB_HOST: movie-db
       DB_PORT: 5432
       DB_NAME: movie_db
       DB_USER: postgres
       DB_PASSWORD: postgres
+      VECTOR_SERVICE_URL: http://vector-service:5003
     volumes:
       - ../../web:/app/data
     depends_on:
@@ -88,6 +90,10 @@ services:
       DB_NAME: user_db
       DB_USER: postgres
       DB_PASSWORD: postgres
+      ADMIN_USERNAME: ${ADMIN_USERNAME:-admin}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-admin@moviedb.local}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:-admin123}
+      ADMIN_FULL_NAME: ${ADMIN_FULL_NAME:-System Admin}
     depends_on:
       - user-db
     networks:
@@ -109,11 +115,10 @@ services:
 
       VECTOR_SERVICE_PORT: 5003
       MOVIE_SERVICE_URL: http://movie-service:5001
-
-      MOVIE_VECTORS_NPZ: /app/data/movie_vectors.npz
-      MOVIE_VECTORS_METADATA_CSV: /app/data/imdb_movies_3000.csv
+      CHROMA_PERSIST_DIR: /app/chroma_data
+      EMBEDDING_MODEL: all-MiniLM-L6-v2
     volumes:
-      - ../../web:/app/data
+      - chroma-data:/app/chroma_data
     depends_on:
       - movie-service
     networks:
@@ -182,3 +187,4 @@ networks:
 volumes:
   movie-db-data:
   user-db-data:
+  chroma-data:
