@@ -62,8 +62,27 @@ const adminMovieForm = document.getElementById('adminMovieForm');
 const adminCancelFormBtn = document.getElementById('adminCancelFormBtn');
 const adminMoviesTableBody = document.getElementById('adminMoviesTableBody');
 const adminMessage = document.getElementById('adminMessage');
+const adminSearchInput = document.getElementById('adminSearchInput');
+const adminSearchFieldSelect = document.getElementById('adminSearchFieldSelect');
+const adminSearchBtn = document.getElementById('adminSearchBtn');
+const adminClearSearchBtn = document.getElementById('adminClearSearchBtn');
+const adminResultSummary = document.getElementById('adminResultSummary');
+const adminPrevBtn = document.getElementById('adminPrevBtn');
+const adminNextBtn = document.getElementById('adminNextBtn');
+const adminPageInfo = document.getElementById('adminPageInfo');
+const adminPoster = document.getElementById('adminPoster');
+const adminPosterFile = document.getElementById('adminPosterFile');
+const adminUploadPosterBtn = document.getElementById('adminUploadPosterBtn');
+const adminFetchPosterBtn = document.getElementById('adminFetchPosterBtn');
+const adminPosterPreview = document.getElementById('adminPosterPreview');
 
+const ADMIN_PER_PAGE = 15;
 let adminMoviesCache = [];
+let adminPage = 1;
+let adminSearch = '';
+let adminSearchField = 'movie_name';
+let adminTotalPages = 1;
+let adminTotalMovies = 0;
 
 // Initialize
 document.addEventListener('DOMContentLoaded', async () => {
@@ -119,8 +138,21 @@ document.addEventListener('DOMContentLoaded', async () => {
     adminPanelBtn?.addEventListener('click', () => switchTab('admin'));
     adminAddMovieBtn?.addEventListener('click', () => openAdminMovieForm('create'));
     adminCancelFormBtn?.addEventListener('click', closeAdminMovieForm);
+    adminUploadPosterBtn?.addEventListener('click', () => adminPosterFile?.click());
+    adminPosterFile?.addEventListener('change', handlePosterFileChange);
+    adminFetchPosterBtn?.addEventListener('click', handleFetchPosterFromApi);
+    adminPoster?.addEventListener('input', () => updatePosterPreview());
     adminMovieForm?.addEventListener('submit', handleAdminMovieSubmit);
     adminMoviesTableBody?.addEventListener('click', handleAdminTableAction);
+    adminSearchBtn?.addEventListener('click', handleAdminSearch);
+    adminClearSearchBtn?.addEventListener('click', clearAdminSearch);
+    adminSearchInput?.addEventListener('keypress', (event) => {
+        if (event.key === 'Enter') {
+            handleAdminSearch();
+        }
+    });
+    adminPrevBtn?.addEventListener('click', () => changeAdminPage(-1));
+    adminNextBtn?.addEventListener('click', () => changeAdminPage(1));
 
     // Tab switching
     tabButtons.forEach(btn => {
@@ -947,22 +979,91 @@ function setAdminMessage(message, isError = false) {
     adminMessage.classList.toggle('error', isError);
 }
 
-async function loadAdminMovies() {
+async function loadAdminMovies(page = adminPage, search = adminSearch, field = adminSearchField) {
     if (!isAdminUser()) return;
 
     adminMoviesTableBody.innerHTML = '<tr><td colspan="6">Đang tải...</td></tr>';
     try {
-        const response = await authRequest('/api/movies?page=1&per_page=100');
+        const params = new URLSearchParams({
+            page: String(page),
+            per_page: String(ADMIN_PER_PAGE),
+            field,
+        });
+        if (search) {
+            params.set('search', search);
+        }
+
+        const response = await authRequest(`/api/movies?${params.toString()}`);
         adminMoviesCache = response.movies || response.data || [];
+        adminPage = response.page || page;
+        adminTotalPages = response.total_pages || 1;
+        adminTotalMovies = response.total ?? adminMoviesCache.length;
+        adminSearch = search;
+        adminSearchField = field;
+
+        if (adminPage > adminTotalPages && adminTotalPages > 0) {
+            await loadAdminMovies(adminTotalPages, search, field);
+            return;
+        }
+
         renderAdminMoviesTable();
+        updateAdminPagination();
+        updateAdminResultSummary();
     } catch (error) {
         adminMoviesTableBody.innerHTML = `<tr><td colspan="6">${escapeHtml(error.message)}</td></tr>`;
+        updateAdminResultSummary(true);
     }
+}
+
+function handleAdminSearch() {
+    const searchTerm = adminSearchInput?.value.trim() || '';
+    const field = adminSearchFieldSelect?.value || 'movie_name';
+    loadAdminMovies(1, searchTerm, field);
+}
+
+function clearAdminSearch() {
+    if (adminSearchInput) adminSearchInput.value = '';
+    if (adminSearchFieldSelect) adminSearchFieldSelect.value = 'movie_name';
+    loadAdminMovies(1, '', 'movie_name');
+}
+
+function changeAdminPage(delta) {
+    const newPage = adminPage + delta;
+    if (newPage >= 1 && newPage <= adminTotalPages) {
+        loadAdminMovies(newPage, adminSearch, adminSearchField);
+    }
+}
+
+function updateAdminPagination() {
+    if (!adminPageInfo || !adminPrevBtn || !adminNextBtn) return;
+    adminPageInfo.textContent = `Trang ${adminPage} / ${adminTotalPages}`;
+    adminPrevBtn.disabled = adminPage <= 1;
+    adminNextBtn.disabled = adminPage >= adminTotalPages;
+}
+
+function updateAdminResultSummary(isError = false) {
+    if (!adminResultSummary) return;
+    if (isError) {
+        adminResultSummary.textContent = '';
+        return;
+    }
+
+    const searchLabel = adminSearch
+        ? ` cho "${adminSearch}"`
+        : '';
+    adminResultSummary.textContent = adminTotalMovies
+        ? `Hiển thị ${adminMoviesCache.length} / ${adminTotalMovies} phim${searchLabel}`
+        : adminSearch
+            ? `Không tìm thấy phim nào cho "${adminSearch}"`
+            : 'Chưa có phim nào trong hệ thống';
 }
 
 function renderAdminMoviesTable() {
     if (!adminMoviesCache.length) {
-        adminMoviesTableBody.innerHTML = '<tr><td colspan="6">Chưa có phim nào.</td></tr>';
+        const emptyMessage = adminSearch
+            ? `Không tìm thấy phim nào cho "${escapeHtml(adminSearch)}".`
+            : 'Chưa có phim nào.';
+        adminMoviesTableBody.innerHTML = `<tr><td colspan="6">${emptyMessage}</td></tr>`;
         return;
     }
 
@@ -996,7 +1097,11 @@ function openAdminMovieForm(mode, movie = null) {
     document.getElementById('adminVotes').value = movie?.votes || '';
     document.getElementById('adminDirector').value = movie?.director || '';
     document.getElementById('adminStar').value = movie?.star || '';
-    document.getElementById('adminPoster').value = movie?.poster || '';
+    
+    const posterUrl = movie?.poster || '';
+    document.getElementById('adminPoster').value = posterUrl;
+    updatePosterPreview(posterUrl);
+    
     document.getElementById('adminDescription').value = movie?.description || '';
     setAdminMessage('');
 }
@@ -1006,6 +1111,112 @@ function closeAdminMovieForm() {
     adminMovieForm.reset();
     document.getElementById('adminMovieId').readOnly = false;
     document.getElementById('adminEditingMovieId').value = '';
+    
+    const adminPosterFile = document.getElementById('adminPosterFile');
+    if (adminPosterFile) adminPosterFile.value = '';
+    updatePosterPreview('');
+}
+
+function updatePosterPreview(url) {
+    const previewContainer = document.querySelector('.poster-preview-container');
+    const previewImg = document.getElementById('adminPosterPreview');
+    const posterInput = document.getElementById('adminPoster');
+    
+    const currentUrl = typeof url === 'string' ? url : (posterInput ? posterInput.value.trim() : '');
+    
+    if (currentUrl && previewImg && previewContainer) {
+        previewImg.src = currentUrl;
+        previewContainer.style.display = 'block';
+    } else if (previewContainer) {
+        previewContainer.style.display = 'none';
+        if (previewImg) previewImg.src = '';
+    }
+}
+
+async function handlePosterFileChange(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    setAdminMessage('Đang tải ảnh lên...');
+    
+    try {
+        const headers = {};
+        if (authToken) {
+            headers.Authorization = `Bearer ${authToken}`;
+        }
+        
+        const response = await fetch(apiUrl('/api/movies/upload-poster'), {
+            method: 'POST',
+            headers: headers,
+            body: formData
+        });
+        
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(data.error || 'Tải ảnh lên thất bại');
+        }
+        
+        if (data.url) {
+            document.getElementById('adminPoster').value = data.url;
+            updatePosterPreview(data.url);
+            setAdminMessage('Đã tải ảnh poster lên thành công.');
+        } else {
+            throw new Error('Không nhận được URL ảnh từ máy chủ');
+        }
+    } catch (error) {
+        setAdminMessage(error.message, true);
+    }
+}
+
+async function handleFetchPosterFromApi() {
+    const movieId = document.getElementById('adminMovieId').value.trim();
+    if (!movieId) {
+        setAdminMessage('Vui lòng nhập Movie ID (ví dụ: tt0111161) trước khi lấy poster từ API.', true);
+        return;
+    }
+    
+    setAdminMessage('Đang tìm ảnh poster từ IMDb...');
+    
+    try {
+        const headers = {};
+        if (authToken) {
+            headers.Authorization = `Bearer ${authToken}`;
+        }
+        
+        const response = await fetch(`https://api.imdbapi.dev/titles/${encodeURIComponent(movieId)}/images`);
+        
+        const data = await response.json().catch(() => ({}));
+        if (!response.ok) {
+            throw new Error(data.error || 'Không thể lấy dữ liệu ảnh từ API.');
+        }
+        
+        const images = data.images || [];
+        const posterImages = images.filter(img => img.type === 'poster' && img.url);
+        
+        if (posterImages.length > 0) {
+            let selectedPoster = posterImages[0];
+            let maxArea = 0;
+            posterImages.forEach(img => {
+                const w = parseInt(img.width) || 0;
+                const h = parseInt(img.height) || 0;
+                if (w * h > maxArea) {
+                    maxArea = w * h;
+                    selectedPoster = img;
+                }
+            });
+            
+            document.getElementById('adminPoster').value = selectedPoster.url;
+            updatePosterPreview(selectedPoster.url);
+            setAdminMessage(`Đã lấy thành công poster từ API (độ phân giải ${selectedPoster.width}x${selectedPoster.height}).`);
+        } else {
+            throw new Error('Không tìm thấy ảnh loại "poster" nào cho phim này.');
+        }
+    } catch (error) {
+        setAdminMessage(error.message, true);
+    }
 }
 
 function collectAdminMoviePayload() {
@@ -1048,7 +1259,7 @@ async function handleAdminMovieSubmit(event) {
         }
 
         closeAdminMovieForm();
-        await loadAdminMovies();
+        await loadAdminMovies(adminPage, adminSearch, adminSearchField);
         if (movieListView.style.display !== 'none') {
             loadMovies(currentPage, currentSearch, currentSearchField);
         }
@@ -1077,7 +1288,10 @@ async function handleAdminTableAction(event) {
         try {
             await authRequest(`/api/movies/${encodeURIComponent(movieId)}`, { method: 'DELETE' });
             setAdminMessage('Đã xóa phim.');
-            await loadAdminMovies();
+            const nextPage = adminMoviesCache.length === 1 && adminPage > 1
+                ? adminPage - 1
+                : adminPage;
+            await loadAdminMovies(nextPage, adminSearch, adminSearchField);
             if (movieListView.style.display !== 'none') {
                 loadMovies(currentPage, currentSearch, currentSearchField);
             }

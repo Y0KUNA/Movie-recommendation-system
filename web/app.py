@@ -212,6 +212,62 @@ def create_movie_api():
         return jsonify({'error': str(exc)}), 500
 
 
+@app.route('/api/movies/upload-poster', methods=['POST'])
+def upload_poster_api():
+    error_response = require_admin()
+    if error_response:
+        return error_response
+
+    if 'file' not in request.files:
+        return jsonify({'error': 'Không tìm thấy tệp tin trong yêu cầu'}), 400
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': 'Tên tệp tin trống'}), 400
+    if file:
+        import uuid
+        ext = file.filename.rsplit('.', 1)[-1].lower() if '.' in file.filename else ''
+        if ext not in {'png', 'jpg', 'jpeg', 'webp', 'gif'}:
+            return jsonify({'error': 'Định dạng tệp không hợp lệ. Chỉ chấp nhận png, jpg, jpeg, webp, gif.'}), 400
+        
+        static_posters_dir = os.path.join(app.root_path, 'static', 'posters')
+        os.makedirs(static_posters_dir, exist_ok=True)
+        unique_name = f"{uuid.uuid4().hex}.{ext}"
+        file.save(os.path.join(static_posters_dir, unique_name))
+        
+        url = f"/static/posters/{unique_name}"
+        return jsonify({'url': url}), 200
+
+
+@app.route('/api/imdb/poster/<movie_id>')
+def get_imdb_poster(movie_id):
+    error_response = require_admin()
+    if error_response:
+        return error_response
+
+    import urllib.request
+    import urllib.error
+    
+    url = f"https://api.imdbapi.dev/titles/{movie_id}/images"
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)'}
+        )
+        with urllib.request.urlopen(req, timeout=10) as response:
+            data = json.loads(response.read().decode('utf-8'))
+            return jsonify(data)
+    except urllib.error.HTTPError as e:
+        try:
+            err_body = json.loads(e.read().decode('utf-8'))
+            return jsonify(err_body), e.code
+        except:
+            return jsonify({'error': f'Lỗi HTTP từ IMDb API: {e.code}'}), e.code
+    except urllib.error.URLError as e:
+        return jsonify({'error': f'Lỗi kết nối tới IMDb API: {e.reason}'}), 500
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/movies/<movie_id>', methods=['PUT'])
 def update_movie_api(movie_id):
     error_response = require_admin()

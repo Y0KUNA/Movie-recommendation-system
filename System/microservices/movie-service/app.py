@@ -15,6 +15,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
 from common.config import get_config
 from movie_service import DuplicateMovieError, MovieRepository, MovieService
+from poster_service import fetch_imdb_posters, save_poster_upload
 from vector_client import delete_movie_vector, index_movie_vector
 
 app = Flask(__name__)

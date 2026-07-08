@@ -262,10 +262,19 @@
                                 Diễn viên
                                 <input id="adminStar" type="text">
                             </label>
-                            <label class="full-width">
-                                Poster URL
-                                <input id="adminPoster" type="url" placeholder="https://...">
-                            </label>
+                            <div class="full-width poster-section-container">
+                                <label for="adminPoster">Poster URL / Tải ảnh lên</label>
+                                <div class="poster-controls">
+                                    <input id="adminPoster" type="url" placeholder="Nhập link ảnh hoặc chọn tệp tải lên..." style="flex: 1;">
+                                    <input id="adminPosterFile" type="file" accept="image/*" style="display: none;">
+                                    <button type="button" id="adminUploadPosterBtn" class="auth-btn secondary">Tải ảnh lên</button>
+                                    <button type="button" id="adminFetchPosterBtn" class="auth-btn secondary">Lấy poster từ API</button>
+                                </div>
+                                <div class="poster-preview-container" style="margin-top: 10px; display: none;">
+                                    <p style="margin: 0 0 5px; font-size: 0.85rem; color: var(--text-secondary);">Xem trước poster:</p>
+                                    <img id="adminPosterPreview" src="" alt="Poster preview" style="max-height: 150px; border-radius: 8px; border: 1px solid var(--border-color); display: block;">
+                                </div>
+                            </div>
                             <label class="full-width">
                                 Mô tả
                                 <textarea id="adminDescription" rows="4"></textarea>
@@ -276,6 +285,22 @@
                             <button type="button" id="adminCancelFormBtn" class="auth-btn secondary">Hủy</button>
                         </div>
                     </form>
+                </div>
+
+                <div class="admin-toolbar">
+                    <div class="admin-search-box">
+                        <select id="adminSearchFieldSelect" aria-label="Chọn trường tìm kiếm">
+                            <option value="movie_name" selected>Tên phim</option>
+                            <option value="genre">Thể loại</option>
+                            <option value="director">Đạo diễn</option>
+                            <option value="star">Diễn viên</option>
+                            <option value="all">Tất cả</option>
+                        </select>
+                        <input type="text" id="adminSearchInput" placeholder="Tìm phim theo tên, thể loại, đạo diễn...">
+                        <button id="adminSearchBtn" type="button" class="admin-search-btn">Tìm kiếm</button>
+                        <button id="adminClearSearchBtn" type="button" class="auth-btn secondary">Xóa lọc</button>
+                    </div>
+                    <p id="adminResultSummary" class="admin-result-summary"></p>
                 </div>
 
                 <div class="admin-table-wrap">
@@ -294,6 +319,11 @@
                             <tr><td colspan="6">Đang tải...</td></tr>
                         </tbody>
                     </table>
+                </div>
+                <div class="pagination admin-pagination">
+                    <button id="adminPrevBtn" class="pagination-btn">Trước</button>
+                    <span id="adminPageInfo" class="page-info">Trang 1</span>
+                    <button id="adminNextBtn" class="pagination-btn">Sau</button>
                 </div>
             </div>
         </div>
